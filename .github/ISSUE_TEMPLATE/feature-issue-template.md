@@ -1,5 +1,5 @@
 ---
-name: Feature issue template
+name: Feature
 about: Suggest a new feature or improvement for PrevHam
 title: "[Feat]"
 labels: feat
