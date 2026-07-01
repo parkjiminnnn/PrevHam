@@ -24,3 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "PrevHam"
 include(":sample")
+include(":runtime")
+include(":compiler")
