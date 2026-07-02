@@ -1,24 +1,15 @@
 plugins {
-    alias(libs.plugins.android.application)
+    id("prevham.android.application")
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "io.github.parkjiminnnn.prevham"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
 
     defaultConfig {
         applicationId = "io.github.parkjiminnnn.prevham"
-        minSdk = 26
-        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -29,10 +20,6 @@ android {
                 "proguard-rules.pro"
             )
         }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
         compose = true
