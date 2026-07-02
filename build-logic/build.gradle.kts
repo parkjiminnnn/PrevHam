@@ -1,1 +1,8 @@
-// Convention plugins live in :android (binary plugin) and :kotlin-jvm (precompiled script plugin).
+plugins {
+    `kotlin-dsl`
+}
+
+dependencies {
+    implementation(libs.android.gradlePlugin)
+    implementation(libs.kotlin.gradlePlugin)
+}
