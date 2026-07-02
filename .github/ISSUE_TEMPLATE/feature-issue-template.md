@@ -22,7 +22,3 @@ assignees: ''
 ## Tasks
 
 - [ ]
-
-## References
-
-<!-- Optional -->
