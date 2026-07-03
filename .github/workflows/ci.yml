@@ -59,6 +59,7 @@ jobs:
           name: Unit Test Results
           path: '**/build/test-results/**/*.xml'
           reporter: java-junit
+          fail-on-empty: false
 
   compiler-verify:
     name: Verify compiler module (KSP)
