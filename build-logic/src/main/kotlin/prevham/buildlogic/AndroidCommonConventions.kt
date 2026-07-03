@@ -4,7 +4,7 @@ import com.android.build.api.dsl.CommonExtension
 import org.gradle.api.JavaVersion
 
 internal fun CommonExtension.configureAndroidCommon() {
-    compileSdk = 36
+    compileSdk = 37
     compileSdkMinor = 1
 
     defaultConfig.minSdk = 26

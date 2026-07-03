@@ -1,5 +1,6 @@
 plugins {
     id("prevham.android.application")
+    id("prevham.ktlint")
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -17,7 +18,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
