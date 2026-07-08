@@ -1,3 +1,5 @@
+import prevham.buildlogic.configureJvmTarget11
+
 plugins {
     id("java-library")
     id("org.jetbrains.kotlin.jvm")
@@ -10,6 +12,6 @@ java {
 
 kotlin {
     compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
+        configureJvmTarget11()
     }
 }
