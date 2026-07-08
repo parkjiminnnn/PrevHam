@@ -1,7 +1,6 @@
 plugins {
     id("prevham.android.application")
     id("prevham.ktlint")
-    alias(libs.plugins.kotlin.compose)
 }
 
 android {
