@@ -7,4 +7,5 @@ dependencies {
     implementation(libs.kotlin.gradlePlugin)
     implementation(libs.ktlint.gradlePlugin)
     implementation(libs.kotlin.compose.gradlePlugin)
+    implementation(libs.ksp.gradlePlugin)
 }
