@@ -42,8 +42,8 @@ class PrevSymbolProcessor(
         codeGenerator
             .createNewFile(
                 dependencies = Dependencies(aggregating = false, function.containingFile!!),
-                packageName = function.packageName.asString(),
-                fileName = "${function.simpleName.asString()}Preview",
+                packageName = file.packageName,
+                fileName = file.name,
             ).bufferedWriter()
             .use { writer -> file.writeTo(writer) }
     }
