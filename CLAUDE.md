@@ -2,11 +2,13 @@
 
 ## Project Overview
 
-PrevHam is a compile-time Android library that automatically generates Jetpack Compose Preview functions using Kotlin Symbol Processing (KSP).
+PrevHam is a compile-time Android library that automatically generates **Jetpack Compose Preview functions and mock data** using Kotlin Symbol Processing (KSP).
 
 The primary goal is to eliminate repetitive Preview boilerplate by allowing developers to annotate Composable functions with `@Prev`.
 
-All Preview code must be generated at compile time.
+During compilation, PrevHam analyzes the annotated Composable function and generates Preview code with appropriate mock objects for supported parameter types.
+
+All Preview and mock generation must happen at compile time.
 
 The library must not rely on runtime reflection.
 
@@ -29,12 +31,12 @@ PrevHam
 
 ### runtime
 
-Responsibilities
+**Responsibilities**
 
 - Provides the `@Prev` annotation.
-- Contains only the public API required by library users.
+- Contains only the public APIs required by library users.
 
-Constraints
+**Constraints**
 
 - Must not contain any code generation logic.
 - Should have minimal dependencies.
@@ -44,33 +46,36 @@ Constraints
 
 ### compiler
 
-Responsibilities
+**Responsibilities**
 
 - Implements the KSP `SymbolProcessor`.
 - Analyzes the `@Prev` annotation.
 - Generates Preview source code using KotlinPoet.
+- Generates mock data for supported parameter types.
 
-Constraints
+**Constraints**
 
 - All code generation must happen at compile time.
 - Runtime reflection is strictly prohibited.
 - Generated code should be deterministic and reproducible.
+- Code generation should be modular and easily extensible.
 
 ---
 
 ### sample
 
-Responsibilities
+**Responsibilities**
 
 - Demonstrates how to use PrevHam.
 - Serves as a verification project for generated Preview code.
+- Demonstrates supported mock generation features.
 - Acts as a reference implementation for library users.
 
 ---
 
 ### build-logic
 
-Responsibilities
+**Responsibilities**
 
 - Manages shared Gradle configuration.
 - Provides Convention Plugins.
@@ -80,23 +85,53 @@ Responsibilities
 
 ### docs
 
-Responsibilities
+**Responsibilities**
 
 - Contains architecture documentation.
 - Documents KSP implementation details.
+- Documents the mock generation architecture.
 - Provides release and publishing guides.
 
 ---
 
 ### .github
 
-Responsibilities
+**Responsibilities**
 
 - Stores GitHub Actions workflows.
 - Contains Issue and Pull Request templates.
 - Manages CI/CD configuration.
 
+---
+
+## Development Principles
+
+- Generate all Preview and mock code at compile time.
+- Never use runtime reflection.
+- Use KotlinPoet for all generated Kotlin source.
+- Use KSP APIs instead of reflection whenever possible.
+- Follow SOLID principles, especially the Single Responsibility Principle (SRP).
+- Keep the architecture modular and extensible.
+- Separate code generation responsibilities into dedicated components.
+- Implement one feature per branch and one responsibility per Pull Request.
+- Follow the Roadmap defined in the project README.
+
 ## Build / Test Commands
+
+## Documentation Convention
+
+Whenever work in this project changes or adds functionality, features, module responsibilities, architecture, or roadmap status, `README.md` must be updated in the same change to stay in sync.
+
+This applies to (non-exhaustive):
+
+- New or changed features → update the **Features** table.
+- Module additions, removals, or responsibility changes → update **Project Structure** and **Architecture**.
+- Changes to the compile-time flow (KSP processing steps, codegen pipeline) → update **How It Works**, including the Mermaid diagram if the flow changed.
+- Progress on a roadmap item → check it off (or add it) in **Roadmap**.
+- New setup/config steps required to use the library → update **Quick Start**.
+- Dependency or tooling changes (Kotlin, KSP, AGP, etc.) → update **Tech Stack** and version badges.
+
+Treat a code change as incomplete until the corresponding `README.md` sections reflect it. If a change has no user- or contributor-visible effect (e.g. internal refactor with no behavior change), no README update is required — but call that out explicitly rather than skipping silently.
 
 ## Commit Convention
 

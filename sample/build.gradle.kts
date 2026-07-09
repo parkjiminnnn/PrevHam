@@ -1,6 +1,7 @@
 plugins {
     id("prevham.android.application")
     id("prevham.ktlint")
+    id("prevham.ksp")
 }
 
 android {
@@ -27,6 +28,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":runtime"))
+    ksp(project(":compiler"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
