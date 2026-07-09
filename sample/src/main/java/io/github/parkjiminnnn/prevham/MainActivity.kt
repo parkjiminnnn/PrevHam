@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.parkjiminnnn.prevham.ui.theme.PrevHamTheme
+import io.github.parkjiminnnn.runtime.Prev
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,6 +31,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Prev
 @Composable
 fun Greeting(
     name: String,
