@@ -12,6 +12,9 @@ appcompat = "1.7.1"
 material = "1.10.0"
 jetbrainsKotlinJvm = "2.2.10"
 ktlint = "14.2.0"
+ksp = "2.2.10-2.0.2"
+autoService = "1.1.1"
+autoServiceKsp = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,6 +37,10 @@ android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", ver
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "jetbrainsKotlinJvm" }
 ktlint-gradlePlugin = { group = "org.jlleitschuh.gradle", name = "ktlint-gradle", version.ref = "ktlint" }
 kotlin-compose-gradlePlugin = { group = "org.jetbrains.kotlin.plugin.compose", name = "org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
+ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "symbol-processing-gradle-plugin", version.ref = "ksp" }
+ksp-symbol-processing-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
+autoservice-annotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "autoService" }
+autoservice-ksp = { group = "dev.zacsweers.autoservice", name = "auto-service-ksp", version.ref = "autoServiceKsp" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
