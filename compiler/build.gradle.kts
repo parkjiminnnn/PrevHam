@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     implementation(libs.ksp.symbol.processing.api)
+    implementation(libs.kotlinpoet)
     compileOnly(libs.autoservice.annotations)
     ksp(libs.autoservice.ksp)
 }

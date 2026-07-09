@@ -15,6 +15,7 @@ ktlint = "14.2.0"
 ksp = "2.2.10-2.0.2"
 autoService = "1.1.1"
 autoServiceKsp = "1.2.0"
+kotlinpoet = "1.18.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,6 +42,7 @@ ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "symbol-processin
 ksp-symbol-processing-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 autoservice-annotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "autoService" }
 autoservice-ksp = { group = "dev.zacsweers.autoservice", name = "auto-service-ksp", version.ref = "autoServiceKsp" }
+kotlinpoet = { group = "com.squareup", name = "kotlinpoet", version.ref = "kotlinpoet" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
