@@ -28,7 +28,11 @@ class PrevSymbolProcessor(
 
     private fun processFunction(function: KSFunctionDeclaration) {
         if (!function.isComposable()) {
-            logger.error("@Prev can only be applied to a @Composable function", function)
+            logger.error(
+                "[PrevHam] @Prev can only be applied to a @Composable function, " +
+                    "but '${function.simpleName.asString()}' is not annotated with @Composable",
+                function,
+            )
             return
         }
 
