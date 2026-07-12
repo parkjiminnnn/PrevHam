@@ -28,8 +28,9 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 
 | Feature | Description | Status |
 |---|---|---|
-| `@Prev` annotation | Single annotation to trigger Preview generation | ✅ In progress |
-| Primitive mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. | 🚧 Planned |
+| `@Prev` annotation | Single annotation to trigger Preview generation | ✅ Done |
+| Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet | ✅ Done |
+| Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. | ✅ Done |
 | Data class mocks | Recursively builds mock instances for data class parameters | 🚧 Planned |
 | Nullable support | Handles nullable parameters safely | 🚧 Planned |
 | Collection support | Generates mock `List`, `Set`, `Map` values | 🚧 Planned |
@@ -166,9 +167,9 @@ flowchart LR
 ### v0.1 — Foundation
 - [x] `@Prev` annotation
 - [x] Basic KSP `SymbolProcessor` structure
-- [ ] Automatic Preview generation
-- [ ] Primitive type support
-- [ ] String support
+- [x] Automatic Preview generation
+- [x] Primitive type support
+- [x] String support
 - [ ] Data class mock generation
 
 ### v0.2 — Type coverage
