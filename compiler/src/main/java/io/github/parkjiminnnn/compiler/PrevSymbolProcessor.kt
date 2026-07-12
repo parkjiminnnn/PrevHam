@@ -37,15 +37,15 @@ class PrevSymbolProcessor(
         }
 
         val arguments = buildMockArguments(function) ?: return
-        val file = PreviewFileGenerator.generate(function, arguments)
+        val fileSpec = PreviewFileGenerator.generate(function, arguments)
 
         codeGenerator
             .createNewFile(
                 dependencies = Dependencies(aggregating = false, function.containingFile!!),
-                packageName = file.packageName,
-                fileName = file.name,
+                packageName = fileSpec.packageName,
+                fileName = fileSpec.name,
             ).bufferedWriter()
-            .use { writer -> file.writeTo(writer) }
+            .use { writer -> fileSpec.writeTo(writer) }
     }
 
     private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
@@ -54,8 +54,14 @@ class PrevSymbolProcessor(
             val name = parameter.name?.asString() ?: continue
             val type = parameter.type.resolve()
             when {
-                mockGenerators.supports(type) -> arguments[name] = mockGenerators.generate(type)
-                parameter.hasDefault -> Unit
+                mockGenerators.supports(type) -> {
+                    arguments[name] = mockGenerators.generate(type)
+                }
+
+                parameter.hasDefault -> {
+                    Unit
+                }
+
                 else -> {
                     logger.warn(
                         "[PrevHam] skipping @Prev on '${function.simpleName.asString()}': " +
