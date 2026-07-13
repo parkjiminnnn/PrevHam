@@ -25,25 +25,13 @@ internal object PreviewFileGenerator {
                 .addModifiers(KModifier.PRIVATE)
                 .addAnnotation(PREVIEW)
                 .addAnnotation(COMPOSABLE)
-                .addCode(buildCallBody(functionName, arguments))
+                .addCode(buildNamedArgumentsCall(functionName, arguments))
+                .addCode("\n")
                 .build()
 
         return FileSpec
             .builder(packageName, previewName)
             .addFunction(previewFunction)
             .build()
-    }
-
-    private fun buildCallBody(
-        functionName: String,
-        arguments: Map<String, CodeBlock>,
-    ): CodeBlock {
-        val body = CodeBlock.builder().add("%L(", functionName)
-        if (arguments.isNotEmpty()) {
-            body.indent().add("\n")
-            arguments.forEach { (name, value) -> body.add("%L = %L,\n", name, value) }
-            body.unindent()
-        }
-        return body.add(")\n").build()
     }
 }
