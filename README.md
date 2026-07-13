@@ -31,7 +31,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | `@Prev` annotation | Single annotation to trigger Preview generation | ✅ Done |
 | Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet | ✅ Done |
 | Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. | ✅ Done |
-| Data class mocks | Recursively builds mock instances for data class parameters | 🚧 Planned |
+| Data class mocks | Builds mock instances for flat data class parameters | ✅ Done |
 | Nullable support | Handles nullable parameters safely | 🚧 Planned |
 | Collection support | Generates mock `List`, `Set`, `Map` values | 🚧 Planned |
 | Enum support | Picks a valid mock value from enum constants | 🚧 Planned |
@@ -170,7 +170,7 @@ flowchart LR
 - [x] Automatic Preview generation
 - [x] Primitive type support
 - [x] String support
-- [ ] Data class mock generation
+- [x] Data class mock generation
 
 ### v0.2 — Type coverage
 - [ ] Nullable type support

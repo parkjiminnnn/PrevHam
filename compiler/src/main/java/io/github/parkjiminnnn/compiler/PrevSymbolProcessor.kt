@@ -10,12 +10,14 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
+import io.github.parkjiminnnn.compiler.mock.buildMockArguments
+import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
 
 class PrevSymbolProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : SymbolProcessor {
-    private val mockGenerators = MockGeneratorRegistry()
+    private val mockGenerators = MockGeneratorRegistry.default()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation(PREV_ANNOTATION_NAME).toList()
@@ -49,30 +51,16 @@ class PrevSymbolProcessor(
     }
 
     private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
-        val arguments = LinkedHashMap<String, CodeBlock>()
-        for (parameter in function.parameters) {
-            val name = parameter.name?.asString() ?: continue
-            val type = parameter.type.resolve()
-            when {
-                mockGenerators.supports(type) -> {
-                    arguments[name] = mockGenerators.generate(type)
-                }
-
-                parameter.hasDefault -> {
-                    Unit
-                }
-
-                else -> {
-                    logger.warn(
-                        "[PrevHam] skipping @Prev on '${function.simpleName.asString()}': " +
-                            "no mock generator available for parameter '$name'",
-                        function,
-                    )
-                    return null
-                }
-            }
+        val unsupported = firstUnsupportedParameter(function.parameters, mockGenerators)
+        if (unsupported != null) {
+            logger.warn(
+                "[PrevHam] skipping @Prev on '${function.simpleName.asString()}': " +
+                    "no mock generator available for parameter '${unsupported.name?.asString()}'",
+                function,
+            )
+            return null
         }
-        return arguments
+        return buildMockArguments(function.parameters, mockGenerators)
     }
 
     private fun KSFunctionDeclaration.isComposable(): Boolean =
