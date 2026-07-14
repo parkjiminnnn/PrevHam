@@ -11,12 +11,17 @@ internal class MockGeneratorRegistry(
     fun generate(type: KSType): CodeBlock = generators.first { it.supports(type) }.generate(type)
 
     companion object {
-        // scalarRegistry excludes DataClassMockGenerator so nested data classes stay unsupported for now.
+        // scalarRegistry excludes DataClassMockGenerator/CollectionMockGenerator so nested data
+        // classes and collection-typed data class fields stay unsupported for now.
+        // compositeRegistry backs CollectionMockGenerator's elements, so List<Int>/List<Status>/
+        // List<User> all work, without supporting nested collections (List<List<T>>).
         // NullableFallbackMockGenerator is always last, so a real mock is preferred whenever one is available.
         fun default(): MockGeneratorRegistry {
             val scalarGenerators = listOf(PrimitiveMockGenerator(), StringMockGenerator(), EnumMockGenerator())
             val scalarRegistry = MockGeneratorRegistry(scalarGenerators + NullableFallbackMockGenerator())
-            val fullGenerators = scalarGenerators + DataClassMockGenerator(scalarRegistry) + NullableFallbackMockGenerator()
+            val compositeGenerators = scalarGenerators + DataClassMockGenerator(scalarRegistry)
+            val compositeRegistry = MockGeneratorRegistry(compositeGenerators + NullableFallbackMockGenerator())
+            val fullGenerators = compositeGenerators + CollectionMockGenerator(compositeRegistry) + NullableFallbackMockGenerator()
             return MockGeneratorRegistry(fullGenerators)
         }
     }
