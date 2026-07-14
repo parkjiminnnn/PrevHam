@@ -182,6 +182,7 @@ When creating a GitHub Issue, always follow these rules:
 - **Labels**: automatically apply the label matching the issue type inferred from the title prefix, using the repository's existing labels: `[Feat]` → `feat`, `[Fix]` → `bug`, `[Docs]` → `docs`, `[CI]` → `ci`, `[Build]` → `build`, `[Test]` → `test`, `[Refactor]` → `refactor`, `[Release]` → `release`.
 - **Assignee**: assign the issue to the repository owner (`--assignee @me`).
 - Use the structure of the matching template in `.github/ISSUE_TEMPLATE/` (Summary / Motivation / Proposal / Tasks for a feature issue).
+- **Branch creation**: when starting work on an issue, create the branch with `gh issue develop <issue-number> --checkout` instead of a plain `git checkout -b`. This links the branch to the issue's Development section immediately, independent of which branch the eventual PR targets (see the Development note under [PR Rules](#pr-rules) for why this matters in this repo).
 
 ## PR Convention
 
@@ -299,5 +300,5 @@ When creating a Pull Request, always follow these rules:
 - Assume the branch name follows the `type-issueNumber-description` convention.
 - **Labels**: automatically apply the label matching the PR type, using the same mapping as [Issue Convention](#issue-convention) (`feat` branch → `feat` label, `fix` → `bug`, `docs` → `docs`, `ci` → `ci`, `build` → `build`, `test` → `test`, `refactor` → `refactor`).
 - **Assignee**: assign the PR to the repository owner (`--assignee @me`).
-- **Development**: link the PR to its related issue's Development section. The `Closes #<issue-number>` line in the PR body does this automatically, so prefer creating the branch with `gh issue develop <issue-number> --checkout` (which links the branch to the issue up front) over a plain `git checkout -b`.
+- **Development**: this repository's default branch is `main`, but feature branches are merged into `develop`. GitHub only auto-links a PR to an issue's Development section (and auto-closes it on merge) via `Closes #<issue-number>` when the PR targets the *default* branch — so a `feature → develop` PR does **not** get linked that way, even though the text is still correct and useful to keep. This is why branches must be created with `gh issue develop <issue-number> --checkout` (see [Issue Convention](#issue-convention)): it links the branch to the issue's Development section regardless of the PR's target branch.
 
