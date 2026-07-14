@@ -14,7 +14,7 @@ internal class MockGeneratorRegistry(
         // scalarRegistry excludes DataClassMockGenerator so nested data classes stay unsupported for now.
         // NullableFallbackMockGenerator is always last, so a real mock is preferred whenever one is available.
         fun default(): MockGeneratorRegistry {
-            val scalarGenerators = listOf(PrimitiveMockGenerator(), StringMockGenerator())
+            val scalarGenerators = listOf(PrimitiveMockGenerator(), StringMockGenerator(), EnumMockGenerator())
             val scalarRegistry = MockGeneratorRegistry(scalarGenerators + NullableFallbackMockGenerator())
             val fullGenerators = scalarGenerators + DataClassMockGenerator(scalarRegistry) + NullableFallbackMockGenerator()
             return MockGeneratorRegistry(fullGenerators)

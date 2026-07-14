@@ -7,6 +7,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.parkjiminnnn.runtime.Prev
 
+data class User(
+    val id: Int,
+    val name: String,
+    val age: Int,
+)
+
 @Prev
 @Composable
 fun UserCard(
