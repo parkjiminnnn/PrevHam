@@ -175,6 +175,14 @@ docs: update README
 
 ```
 
+## Issue Convention
+
+When creating a GitHub Issue, always follow these rules:
+
+- **Labels**: automatically apply the label matching the issue type inferred from the title prefix, using the repository's existing labels: `[Feat]` → `feat`, `[Fix]` → `bug`, `[Docs]` → `docs`, `[CI]` → `ci`, `[Build]` → `build`, `[Test]` → `test`, `[Refactor]` → `refactor`, `[Release]` → `release`.
+- **Assignee**: assign the issue to the repository owner (`--assignee @me`).
+- Use the structure of the matching template in `.github/ISSUE_TEMPLATE/` (Summary / Motivation / Proposal / Tasks for a feature issue).
+
 ## PR Convention
 
 ### PR Title
@@ -289,4 +297,7 @@ When creating a Pull Request, always follow these rules:
 - List the actual implementation details as bullet points in the **Changes** section.
 - Write both the PR title and body in **English**.
 - Assume the branch name follows the `type-issueNumber-description` convention.
+- **Labels**: automatically apply the label matching the PR type, using the same mapping as [Issue Convention](#issue-convention) (`feat` branch → `feat` label, `fix` → `bug`, `docs` → `docs`, `ci` → `ci`, `build` → `build`, `test` → `test`, `refactor` → `refactor`).
+- **Assignee**: assign the PR to the repository owner (`--assignee @me`).
+- **Development**: link the PR to its related issue's Development section. The `Closes #<issue-number>` line in the PR body does this automatically, so prefer creating the branch with `gh issue develop <issue-number> --checkout` (which links the branch to the issue up front) over a plain `git checkout -b`.
 
