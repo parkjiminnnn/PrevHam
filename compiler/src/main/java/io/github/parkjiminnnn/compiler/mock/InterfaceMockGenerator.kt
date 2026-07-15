@@ -9,9 +9,12 @@ import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.MemberName
 
 internal class InterfaceMockGenerator : MockGenerator {
+    // Generic interfaces (e.g. Repository<T>) are out of scope for now — mockk<T>() needs the
+    // resolved type arguments too (mockk<Repository<String>>()), which this generator doesn't
+    // build yet. Left for the dedicated generic type support work.
     override fun supports(type: KSType): Boolean {
         val declaration = type.declaration as? KSClassDeclaration ?: return false
-        if (declaration.isOwnedByAnotherGenerator()) return false
+        if (declaration.isOwnedByAnotherGenerator() || type.arguments.isNotEmpty()) return false
         return declaration.classKind == ClassKind.INTERFACE ||
             (declaration.classKind == ClassKind.CLASS && Modifier.DATA !in declaration.modifiers)
     }
