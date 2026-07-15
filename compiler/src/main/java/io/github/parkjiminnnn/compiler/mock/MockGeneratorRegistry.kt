@@ -11,13 +11,23 @@ internal class MockGeneratorRegistry(
     fun generate(type: KSType): CodeBlock = generators.first { it.supports(type) }.generate(type)
 
     companion object {
-        // scalarRegistry excludes DataClassMockGenerator so nested data classes stay unsupported for now.
-        // NullableFallbackMockGenerator is always last, so a real mock is preferred whenever one is available.
-        fun default(): MockGeneratorRegistry {
-            val scalarGenerators = listOf(PrimitiveMockGenerator(), StringMockGenerator(), EnumMockGenerator())
-            val scalarRegistry = MockGeneratorRegistry(scalarGenerators + NullableFallbackMockGenerator())
-            val fullGenerators = scalarGenerators + DataClassMockGenerator(scalarRegistry) + NullableFallbackMockGenerator()
-            return MockGeneratorRegistry(fullGenerators)
+        private const val MAX_DEPTH = 3
+
+        fun default(): MockGeneratorRegistry = build(depth = 0)
+
+        // Builds a chain of registries indexed by depth: DataClass/Collection generators at
+        // depth N recurse into a registry built for depth N + 1, and are dropped once MAX_DEPTH
+        // is reached. This bounds nested/recursive mock generation so a self-referential or
+        // deeply nested type is treated as unsupported instead of causing a StackOverflowError.
+        private fun build(depth: Int): MockGeneratorRegistry {
+            val leafGenerators = listOf(PrimitiveMockGenerator(), StringMockGenerator(), EnumMockGenerator())
+            if (depth >= MAX_DEPTH) {
+                return MockGeneratorRegistry(leafGenerators + NullableFallbackMockGenerator())
+            }
+
+            val nested = build(depth + 1)
+            val recursiveGenerators = leafGenerators + DataClassMockGenerator(nested) + CollectionMockGenerator(nested)
+            return MockGeneratorRegistry(recursiveGenerators + NullableFallbackMockGenerator())
         }
     }
 }

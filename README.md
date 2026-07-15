@@ -33,9 +33,9 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. | ✅ Done |
 | Data class mocks | Builds mock instances for flat data class parameters | ✅ Done |
 | Nullable support | Uses a real mock when possible, falls back to `null` otherwise | ✅ Done |
-| Collection support | Generates mock `List`, `Set`, `Map` values | 🚧 Planned |
+| Collection support | Generates mock `List`, `Set`, `Map` values | ✅ Done |
 | Enum support | Picks a valid mock value from enum constants | ✅ Done |
-| Nested data classes | Recursive mock generation for nested object graphs | 🚧 Planned |
+| Nested data classes | Recursive mock generation for nested data classes and collections (depth-limited) | ✅ Done |
 | Interface mocks | Generates interface mocks via MockK | 🚧 Planned |
 | Preview options | Dark mode, locale, font scale variants | 🚧 Planned |
 
@@ -175,8 +175,8 @@ flowchart LR
 ### v0.2 — Type coverage
 - [x] Nullable type support
 - [x] Enum support
-- [ ] Collection support
-- [ ] Nested data class support
+- [x] Collection support
+- [x] Nested data class support
 
 ### v0.3 — Advanced types
 - [ ] Function type support
