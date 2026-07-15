@@ -27,7 +27,11 @@ internal class MockGeneratorRegistry(
             }
 
             val nested = build(depth + 1)
-            val recursiveGenerators = leafGenerators + DataClassMockGenerator(nested) + CollectionMockGenerator(nested)
+            val recursiveGenerators =
+                leafGenerators +
+                    DataClassMockGenerator(nested) +
+                    CollectionMockGenerator(nested) +
+                    FunctionTypeMockGenerator(nested)
             return MockGeneratorRegistry(recursiveGenerators + NullableFallbackMockGenerator())
         }
     }
