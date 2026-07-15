@@ -20,7 +20,8 @@ internal class MockGeneratorRegistry(
         // is reached. This bounds nested/recursive mock generation so a self-referential or
         // deeply nested type is treated as unsupported instead of causing a StackOverflowError.
         private fun build(depth: Int): MockGeneratorRegistry {
-            val leafGenerators = listOf(PrimitiveMockGenerator(), StringMockGenerator(), EnumMockGenerator())
+            val leafGenerators =
+                listOf(PrimitiveMockGenerator(), StringMockGenerator(), EnumMockGenerator(), InterfaceMockGenerator())
             if (depth >= MAX_DEPTH) {
                 return MockGeneratorRegistry(leafGenerators + NullableFallbackMockGenerator())
             }
