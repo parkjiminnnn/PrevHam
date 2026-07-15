@@ -36,7 +36,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Collection support | Generates mock `List`, `Set`, `Map` values | ✅ Done |
 | Enum support | Picks a valid mock value from enum constants | ✅ Done |
 | Nested data classes | Recursive mock generation for nested data classes and collections (depth-limited) | ✅ Done |
-| Interface mocks | Generates interface mocks via MockK | 🚧 Planned |
+| Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) | ✅ Done |
 | Preview options | Dark mode, locale, font scale variants | 🚧 Planned |
 
 > **Legend** — ✅ In progress · 🚧 Planned · See the full [Roadmap](#-roadmap) for release-by-release detail.
@@ -106,6 +106,10 @@ plugins {
 dependencies {
     implementation("io.github.parkjiminnnn:runtime:<version>")
     ksp("io.github.parkjiminnnn:compiler:<version>")
+
+    // Required if any @Prev composable has an interface or non-data-class parameter
+    // (e.g. Modifier) — PrevHam mocks those with MockK's mockk<T>(relaxed = true).
+    implementation("io.mockk:mockk:<version>")
 }
 ```
 
@@ -180,7 +184,7 @@ flowchart LR
 
 ### v0.3 — Advanced types
 - [ ] Function type support
-- [ ] Interface mock generation (MockK)
+- [x] Interface mock generation (MockK)
 - [ ] Generic type support
 
 ### v0.4 — Preview options
