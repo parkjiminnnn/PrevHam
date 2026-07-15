@@ -30,9 +30,9 @@ internal class CollectionMockGenerator(
     private companion object {
         val FACTORY_NAMES =
             mapOf(
-                "kotlin.collections.List" to "listOf",
-                "kotlin.collections.Set" to "setOf",
-                "kotlin.collections.Map" to "mapOf",
+                KOTLIN_LIST_QUALIFIED_NAME to "listOf",
+                KOTLIN_SET_QUALIFIED_NAME to "setOf",
+                KOTLIN_MAP_QUALIFIED_NAME to "mapOf",
             )
     }
 }

@@ -38,16 +38,14 @@ internal class InterfaceMockGenerator : MockGenerator {
     }
 
     // List/Set/Map and function types (kotlin.FunctionN) are also declared as `interface` in
-    // Kotlin, but they already have dedicated generators (CollectionMockGenerator, and a future
+    // Kotlin, but they already have dedicated generators (CollectionMockGenerator,
     // FunctionTypeMockGenerator) that produce more useful mocks than a MockK relaxed mock.
     private fun KSClassDeclaration.isOwnedByAnotherGenerator(): Boolean {
         val name = qualifiedName?.asString() ?: return false
-        return name in COLLECTION_QUALIFIED_NAMES || name.startsWith("kotlin.Function")
+        return name in KOTLIN_COLLECTION_QUALIFIED_NAMES || name.startsWith(KOTLIN_FUNCTION_TYPE_PREFIX)
     }
 
     private companion object {
-        val COLLECTION_QUALIFIED_NAMES =
-            setOf("kotlin.collections.List", "kotlin.collections.Set", "kotlin.collections.Map")
         val MOCKK_FUNCTION = MemberName("io.mockk", "mockk")
     }
 }
