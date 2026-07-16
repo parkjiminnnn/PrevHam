@@ -7,22 +7,24 @@ import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.TypeName
 
 internal class InterfaceMockGenerator : MockGenerator {
-    // Generic interfaces (e.g. Repository<T>) are out of scope for now — mockk<T>() needs the
-    // resolved type arguments too (mockk<Repository<String>>()), which this generator doesn't
-    // build yet. Left for the dedicated generic type support work.
     override fun supports(type: KSType): Boolean {
         val declaration = type.declaration as? KSClassDeclaration ?: return false
-        if (declaration.isOwnedByAnotherGenerator() || type.arguments.isNotEmpty()) return false
-        return declaration.classKind == ClassKind.INTERFACE ||
-            (declaration.classKind == ClassKind.CLASS && Modifier.DATA !in declaration.modifiers)
+        if (declaration.isOwnedByAnotherGenerator()) return false
+        val isMockableKind =
+            declaration.classKind == ClassKind.INTERFACE ||
+                (declaration.classKind == ClassKind.CLASS && Modifier.DATA !in declaration.modifiers)
+        return isMockableKind && type.toTypeName() != null
     }
 
     override fun generate(type: KSType): CodeBlock {
         val declaration = type.declaration as KSClassDeclaration
-        val className = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
-        return declaration.selfImplementingCompanionMock(className) ?: CodeBlock.of("%M<%T>(relaxed = true)", MOCKK_FUNCTION, className)
+        val rawClassName = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
+        declaration.selfImplementingCompanionMock(rawClassName)?.let { return it }
+        return CodeBlock.of("%M<%T>(relaxed = true)", MOCKK_FUNCTION, type.toTypeName())
     }
 
     // Some interfaces (e.g. androidx.compose.ui.Modifier) declare a companion object that
@@ -46,6 +48,19 @@ internal class InterfaceMockGenerator : MockGenerator {
     private fun KSClassDeclaration.isOwnedByAnotherGenerator(): Boolean {
         val name = qualifiedName?.asString() ?: return false
         return name in KOTLIN_COLLECTION_QUALIFIED_NAMES || name.startsWith(KOTLIN_FUNCTION_TYPE_PREFIX)
+    }
+
+    // Builds the type name to write inside mockk<...>(), including generic type arguments (e.g.
+    // Repository<String>). Returns null for anything we can't fully resolve (e.g. a star
+    // projection like Repository<*>), so that case stays unsupported rather than emitting broken
+    // code.
+    private fun KSType.toTypeName(): TypeName? {
+        val declaration = declaration as? KSClassDeclaration ?: return null
+        val className = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
+        if (arguments.isEmpty()) return className
+        val typeArgumentNames =
+            arguments.map { argument -> argument.type?.resolve()?.toTypeName() ?: return null }
+        return className.parameterizedBy(typeArgumentNames)
     }
 
     private companion object {

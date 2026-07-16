@@ -38,6 +38,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Nested data classes | Recursive mock generation for nested data classes and collections (depth-limited) | ✅ Done |
 | Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) | ✅ Done |
 | Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types | ✅ Done |
+| Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) | ✅ Done |
 | Preview options | Dark mode, locale, font scale variants | 🚧 Planned |
 
 > **Legend** — ✅ In progress · 🚧 Planned · See the full [Roadmap](#-roadmap) for release-by-release detail.
@@ -186,7 +187,7 @@ flowchart LR
 ### v0.3 — Advanced types
 - [x] Function type support
 - [x] Interface mock generation (MockK)
-- [ ] Generic type support
+- [x] Generic type support
 
 ### v0.4 — Preview options
 - [ ] Preview option support
