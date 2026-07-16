@@ -12,6 +12,7 @@ import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
 import io.github.parkjiminnnn.compiler.mock.buildMockArguments
 import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
+import io.github.parkjiminnnn.compiler.mock.toMockParameter
 
 class PrevSymbolProcessor(
     private val codeGenerator: CodeGenerator,
@@ -51,16 +52,17 @@ class PrevSymbolProcessor(
     }
 
     private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
-        val unsupported = firstUnsupportedParameter(function.parameters, mockGenerators)
+        val parameters = function.parameters.mapNotNull { it.toMockParameter() }
+        val unsupported = firstUnsupportedParameter(parameters, mockGenerators)
         if (unsupported != null) {
             logger.warn(
                 "[PrevHam] skipping @Prev on '${function.simpleName.asString()}': " +
-                    "no mock generator available for parameter '${unsupported.name?.asString()}'",
+                    "no mock generator available for parameter '${unsupported.name}'",
                 function,
             )
             return null
         }
-        return buildMockArguments(function.parameters, mockGenerators)
+        return buildMockArguments(parameters, mockGenerators)
     }
 
     private fun KSFunctionDeclaration.isComposable(): Boolean =
