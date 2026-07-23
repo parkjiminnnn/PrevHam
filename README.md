@@ -106,8 +106,8 @@ plugins {
 
 ```kotlin
 dependencies {
-    implementation("io.github.parkjiminnnn:runtime:<version>")
-    ksp("io.github.parkjiminnnn:compiler:<version>")
+    implementation("io.github.parkjiminnnn:prevham-runtime:<version>")
+    ksp("io.github.parkjiminnnn:prevham-compiler:<version>")
 
     // Required if any @Prev composable has an interface or non-data-class parameter
     // (e.g. Modifier) — PrevHam mocks those with MockK's mockk<T>(relaxed = true).
