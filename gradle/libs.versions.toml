@@ -17,6 +17,7 @@ autoService = "1.1.1"
 autoServiceKsp = "1.2.0"
 kotlinpoet = "1.18.1"
 mockk = "1.13.13"
+kotlinCompileTesting = "0.11.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +46,8 @@ autoservice-annotations = { group = "com.google.auto.service", name = "auto-serv
 autoservice-ksp = { group = "dev.zacsweers.autoservice", name = "auto-service-ksp", version.ref = "autoServiceKsp" }
 kotlinpoet = { group = "com.squareup", name = "kotlinpoet", version.ref = "kotlinpoet" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+kotlin-compile-testing-core = { group = "dev.zacsweers.kctfork", name = "core", version.ref = "kotlinCompileTesting" }
+kotlin-compile-testing-ksp = { group = "dev.zacsweers.kctfork", name = "ksp", version.ref = "kotlinCompileTesting" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
