@@ -26,7 +26,7 @@ internal class PrevCompilationResult(
  * manually to verify KSP output during development.
  */
 @OptIn(ExperimentalCompilerApi::class)
-internal fun compile]Prev(vararg sources: SourceFile): PrevCompilationResult {
+internal fun compilePrev(vararg sources: SourceFile): PrevCompilationResult {
     val compilation =
         KotlinCompilation().apply {
             this.sources = Stubs.all + sources.toList()
