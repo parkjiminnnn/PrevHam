@@ -40,7 +40,8 @@ class PrevSymbolProcessor(
         }
 
         val arguments = buildMockArguments(function) ?: return
-        val fileSpec = PreviewFileGenerator.generate(function, arguments)
+        val options = function.previewOptions()
+        val fileSpec = PreviewFileGenerator.generate(function, arguments, options)
 
         codeGenerator
             .createNewFile(
@@ -74,7 +75,6 @@ class PrevSymbolProcessor(
         }
 
     private companion object {
-        const val PREV_ANNOTATION_NAME = "io.github.parkjiminnnn.runtime.Prev"
         const val COMPOSABLE_ANNOTATION_NAME = "androidx.compose.runtime.Composable"
     }
 }
