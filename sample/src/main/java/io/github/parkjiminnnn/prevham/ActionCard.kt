@@ -15,3 +15,9 @@ fun ActionCard(onClick: () -> Unit) {
 fun ValidatorCard(validate: (String) -> Boolean) {
     Text(text = "validator: ${validate("test")}")
 }
+
+@Prev
+@Composable
+fun RangeValidatorCard(validate: (Int, Int) -> Boolean) {
+    Text(text = "range validator: ${validate(0, 10)}")
+}
