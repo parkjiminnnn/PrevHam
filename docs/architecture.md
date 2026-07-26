@@ -70,3 +70,21 @@ the KSP step, the generated code is:
 The tradeoff is that everything `compiler` does must be derivable from the KSP symbol graph alone
 (`KSType`, `KSClassDeclaration`, `KSFunctionDeclaration`, ...) at the point the function is compiled —
 it cannot inspect actual runtime values, since none exist yet.
+
+## API stability policy
+
+`runtime`'s public API is intentionally minimal: the `@Prev` annotation and its three parameters
+(`darkMode`, `locales`, `fontScales`). Since `runtime` is the only artifact library users compile
+against directly, changes here follow semver, under this policy:
+
+- **New `@Prev` parameters must have a default value.** Every existing `@Prev` usage in a consumer's
+  codebase must keep compiling and behaving identically after upgrading, without any changes on
+  their part.
+- **Existing parameter names, types, and defaults are not renamed or changed** once published,
+  except in a major version bump.
+- **`compiler`'s internals are not part of the public API contract.** Everything in `compiler` other
+  than `PrevSymbolProcessorProvider` (needed for KSP's `SymbolProcessorProvider` service lookup) is
+  `internal`, and consumers never interact with `compiler`'s classes directly — only through the KSP
+  plugin mechanism (`ksp(project(":compiler"))` / `ksp("io.github.parkjiminnnn:prevham-compiler:...")`).
+  This means `compiler`'s internals can be freely refactored without being a breaking change, as long
+  as the generated Preview code's *behavior* for a given `@Prev` usage doesn't change.
