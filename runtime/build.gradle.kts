@@ -1,23 +1,18 @@
+import com.vanniktech.maven.publish.KotlinJvm
+
 plugins {
-    id("prevham.android.library")
+    id("prevham.kotlin.jvm")
     id("prevham.ktlint")
+    id("prevham.publishing")
 }
 
-android {
-    namespace = "io.github.parkjiminnnn.runtime"
+mavenPublishing {
+    coordinates(artifactId = "prevham-runtime")
+    configure(KotlinJvm())
 
-    defaultConfig {
-        consumerProguardFiles("consumer-rules.pro")
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
-        }
+    pom {
+        name.set("PrevHam Runtime")
+        description.set("The @Prev annotation - the public API consumers of PrevHam compile against.")
     }
 }
 
