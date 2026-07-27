@@ -1,7 +1,20 @@
+import com.vanniktech.maven.publish.KotlinJvm
+
 plugins {
     id("prevham.kotlin.jvm")
     id("prevham.ktlint")
     id("prevham.ksp")
+    id("prevham.publishing")
+}
+
+mavenPublishing {
+    coordinates(artifactId = "prevham-compiler")
+    configure(KotlinJvm())
+
+    pom {
+        name.set("PrevHam Compiler")
+        description.set("The KSP processor that generates Jetpack Compose Preview functions and mock data at compile time.")
+    }
 }
 
 dependencies {
