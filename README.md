@@ -17,8 +17,8 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 [Why PrevHam?](#-why-prevham) •
 [Quick Start](#-quick-start) •
 [How It Works](#-how-it-works) •
-[Architecture](#-architecture) •
-[Roadmap](#-roadmap)
+[Roadmap](#-roadmap) •
+[Docs](docs/architecture.md)
 
 </div>
 
@@ -91,14 +91,14 @@ fun UserCard(
 
 ## 🚀 Quick Start
 
-> PrevHam isn't published to Maven Central yet (tracked in [Roadmap → v1.0](#-roadmap)). The coordinates below reflect the intended usage once it ships.
+> Published versions are listed on [Maven Central](https://central.sonatype.com/namespace/io.github.parkjiminnnn).
 
 ### 1. Apply the KSP plugin
 
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("com.google.devtools.ksp") version "<ksp-version>"
+    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
 }
 ```
 
@@ -106,12 +106,14 @@ plugins {
 
 ```kotlin
 dependencies {
-    implementation("io.github.parkjiminnnn:prevham-runtime:<version>")
-    ksp("io.github.parkjiminnnn:prevham-compiler:<version>")
+    implementation("io.github.parkjiminnnn:prevham-runtime:1.0.0")
+    ksp("io.github.parkjiminnnn:prevham-compiler:1.0.0")
 
     // Required if any @Prev composable has an interface or non-data-class parameter
     // (e.g. Modifier) — PrevHam mocks those with MockK's mockk<T>(relaxed = true).
-    implementation("io.mockk:mockk:<version>")
+    // Not debugImplementation: KSP generates Previews for every variant, so the release
+    // compilation needs MockK on its classpath too.
+    implementation("io.mockk:mockk:1.13.13")
 }
 ```
 
@@ -224,8 +226,9 @@ flowchart LR
 - [x] Font scale Preview
 
 ### v1.0 — Stable release
-- [ ] Stable public API
-- [ ] Publish to Maven Central
+- [x] Stable public API
+- [x] Maven Central publishing setup
+- [x] Automated release pipeline
 - [ ] Improved documentation
 - [ ] Sample project polish
 
