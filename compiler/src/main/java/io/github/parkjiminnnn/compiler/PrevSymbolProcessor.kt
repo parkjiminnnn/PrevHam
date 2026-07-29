@@ -14,7 +14,7 @@ import io.github.parkjiminnnn.compiler.mock.buildMockArguments
 import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
 import io.github.parkjiminnnn.compiler.mock.toMockParameter
 
-class PrevSymbolProcessor(
+internal class PrevSymbolProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : SymbolProcessor {
