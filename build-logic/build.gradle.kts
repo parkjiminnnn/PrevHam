@@ -9,4 +9,5 @@ dependencies {
     implementation(libs.kotlin.compose.gradlePlugin)
     implementation(libs.ksp.gradlePlugin)
     implementation(libs.mavenPublish.gradlePlugin)
+    implementation(libs.dokka.gradlePlugin)
 }
