@@ -1,0 +1,31 @@
+# Groups the notes that `gh release create --generate-notes` produces (see
+# .github/workflows/release.yml) by PR label, so a release reads as a changelog rather than a flat
+# list. Labels come from the repository's existing taxonomy - see the Issue Convention in CLAUDE.md.
+changelog:
+  exclude:
+    labels:
+      - release
+  categories:
+    - title: Features
+      labels:
+        - feat
+    - title: Bug Fixes
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - docs
+    - title: Refactoring
+      labels:
+        - refactor
+    - title: Tests
+      labels:
+        - test
+    - title: Build & CI
+      labels:
+        - build
+        - ci
+    # Catches anything unlabelled so a PR can never silently vanish from the notes.
+    - title: Other Changes
+      labels:
+        - "*"

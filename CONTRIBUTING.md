@@ -71,3 +71,9 @@ If you're extending what types PrevHam can mock, see
 [`docs/extending-mock-generators.md`](docs/extending-mock-generators.md) for how the
 `MockGenerator`/`MockGeneratorRegistry` pipeline is structured and where a new generator needs to be
 registered.
+
+## Releasing
+
+Releases are automated: bumping `VERSION_NAME` in `gradle.properties` to a non-`SNAPSHOT` version
+and merging to `main` publishes to Maven Central, tags the commit, and creates a GitHub Release.
+Ordinary merges to `main` do nothing. See [`docs/release.md`](docs/release.md).
