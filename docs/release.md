@@ -57,6 +57,9 @@ Sonatype independently validates every deployment (GPG signatures, POM completen
 sources/javadoc artifacts) and refuses to publish one that fails. A malformed release therefore
 fails at Sonatype rather than becoming public.
 
+Each artifact's `-javadoc.jar` is rendered by Dokka from the module's KDoc rather than being an
+empty placeholder, so public API documentation reaches consumers' IDEs through Maven Central.
+
 ## Credentials
 
 The workflow needs five repository secrets (`Settings` → `Secrets and variables` → `Actions`):

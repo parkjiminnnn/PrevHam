@@ -28,7 +28,11 @@ Requires a JDK compatible with the project's configured Kotlin/AGP toolchain (se
 ./gradlew :compiler:test   # compiler module unit tests
 ./gradlew :sample:kspDebugKotlin       # run KSP only, to inspect generated Preview files
 ./gradlew :sample:compileDebugKotlin   # verify generated Preview code actually compiles
+./gradlew :runtime:dokkaHtml           # render the API reference from KDoc
 ```
+
+API docs land in `runtime/build/dokka/html/` and are published as each artifact's `-javadoc.jar`,
+so KDoc written on public API shows up in consumers' IDEs.
 
 Generated Preview files land under `sample/build/generated/ksp/debug/kotlin/...` — when working on
 `compiler`, inspecting that output directly is the fastest way to confirm a change behaves as
