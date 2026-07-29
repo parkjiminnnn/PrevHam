@@ -11,12 +11,12 @@ group = "io.github.parkjiminnnn"
 version = providers.gradleProperty("VERSION_NAME").getOrElse("1.0.0-SNAPSHOT")
 
 extensions.configure<MavenPublishBaseExtension> {
-    // Uploads to Maven Central as a deployment that waits for a manual "Publish" on the Central
-    // Portal website. Deliberately not automaticRelease: publishing to Maven Central is
-    // irreversible, so the deployment is left pending to be inspected — and dropped if something
-    // is wrong — before it goes public. Requires `mavenCentralUsername`/`mavenCentralPassword`
-    // Gradle properties.
-    publishToMavenCentral(automaticRelease = false)
+    // Uploads to Maven Central and releases the deployment without a manual step on the Central
+    // Portal website, so a release is fully driven by the version bump reaching `main` (see
+    // .github/workflows/release.yml). Sonatype still validates signatures, POM completeness, and
+    // required artifacts, and refuses to publish a deployment that fails validation. Requires
+    // `mavenCentralUsername`/`mavenCentralPassword` Gradle properties.
+    publishToMavenCentral(automaticRelease = true)
 
     // Maven Central requires every artifact to be GPG-signed. Signing is only enforced for
     // non-SNAPSHOT versions, so `publishToMavenLocal -PVERSION_NAME=...-SNAPSHOT` works without
