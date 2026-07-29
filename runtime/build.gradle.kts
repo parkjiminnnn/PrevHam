@@ -1,3 +1,4 @@
+import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinJvm
 
 plugins {
@@ -8,7 +9,9 @@ plugins {
 
 mavenPublishing {
     coordinates(artifactId = "prevham-runtime")
-    configure(KotlinJvm())
+    // Ships the KDoc on @Prev as a real -javadoc.jar instead of the empty placeholder Maven Central
+    // would otherwise accept, so the annotation documents itself in consumers' IDEs.
+    configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaHtml")))
 
     pom {
         name.set("PrevHam Runtime")

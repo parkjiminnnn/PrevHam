@@ -1,3 +1,4 @@
+import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinJvm
 
 plugins {
@@ -9,7 +10,7 @@ plugins {
 
 mavenPublishing {
     coordinates(artifactId = "prevham-compiler")
-    configure(KotlinJvm())
+    configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaHtml")))
 
     pom {
         name.set("PrevHam Compiler")
