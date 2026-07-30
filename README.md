@@ -9,6 +9,7 @@
 
 Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Preview` function and its mock arguments for you — no runtime reflection, no boilerplate.
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.parkjiminnnn/prevham-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/io.github.parkjiminnnn)
 [![CI](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml/badge.svg)](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.2.10-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
