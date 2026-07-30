@@ -15,7 +15,6 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 [Why PrevHam?](#-why-prevham) •
 [Quick Start](#-quick-start) •
 [How It Works](#-how-it-works) •
-[Roadmap](#-roadmap) •
 [Docs](docs/architecture.md)
 
 </div>
@@ -39,7 +38,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
 | Preview options | Dark mode, locale, font scale variants via `@Prev(darkMode, locales, fontScales)` |
 
-> All features listed above shipped by v1.0 — see the [Roadmap](#-roadmap) for release-by-release detail.
+> See [Releases](https://github.com/parkjiminnnn/PrevHam/releases) for what shipped in each version, and [open issues](https://github.com/parkjiminnnn/PrevHam/issues) for what's planned next.
 
 ---
 
@@ -193,42 +192,6 @@ flowchart LR
 3. **Generate mocks** — a dedicated mock generator produces a compile-time-safe value for each supported parameter type.
 4. **Emit source** — [KotlinPoet](https://square.github.io/kotlinpoet/) assembles a new `@Preview @Composable` function that calls the original composable with the generated mocks, stacking one `@Preview` per requested variant (Compose's `@Preview` is `@Repeatable`).
 5. **Compile** — the generated file is fed back into the same compilation unit, so the Preview is available immediately, with full IDE support.
-
----
-
-## 🗺 Roadmap
-
-### v0.1 — Foundation
-- [x] `@Prev` annotation
-- [x] Basic KSP `SymbolProcessor` structure
-- [x] Automatic Preview generation
-- [x] Primitive type support
-- [x] String support
-- [x] Data class mock generation
-
-### v0.2 — Type coverage
-- [x] Nullable type support
-- [x] Enum support
-- [x] Collection support
-- [x] Nested data class support
-
-### v0.3 — Advanced types
-- [x] Function type support
-- [x] Interface mock generation (MockK)
-- [x] Generic type support
-
-### v0.4 — Preview options
-- [x] Preview option support
-- [x] Dark mode Preview
-- [x] Locale Preview
-- [x] Font scale Preview
-
-### v1.0 — Stable release
-- [x] Stable public API
-- [x] Maven Central publishing setup
-- [x] Automated release pipeline
-- [x] Improved documentation
-- [x] Sample project polish
 
 ---
 
