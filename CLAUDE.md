@@ -114,20 +114,19 @@ PrevHam
 - Keep the architecture modular and extensible.
 - Separate code generation responsibilities into dedicated components.
 - Implement one feature per branch and one responsibility per Pull Request.
-- Follow the Roadmap defined in the project README.
+- Follow the priorities tracked in GitHub Issues.
 
 ## Build / Test Commands
 
 ## Documentation Convention
 
-Whenever work in this project changes or adds functionality, features, module responsibilities, architecture, or roadmap status, `README.md` must be updated in the same change to stay in sync.
+Whenever work in this project changes or adds functionality, features, module responsibilities, or architecture, `README.md` must be updated in the same change to stay in sync.
 
 This applies to (non-exhaustive):
 
 - New or changed features → update the **Features** table.
 - Module additions, removals, or responsibility changes → update **Project Structure** and **Architecture**.
 - Changes to the compile-time flow (KSP processing steps, codegen pipeline) → update **How It Works**, including the Mermaid diagram if the flow changed.
-- Progress on a roadmap item → check it off (or add it) in **Roadmap**.
 - New setup/config steps required to use the library → update **Quick Start**.
 - Dependency or tooling changes (Kotlin, KSP, AGP, etc.) → update **Tech Stack** and version badges.
 
