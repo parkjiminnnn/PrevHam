@@ -1,14 +1,12 @@
 <div align="center">
 
-<!-- Project banner/logo — drop an image at docs/images/banner.png (or .svg) and uncomment: -->
-<!-- <img src="docs/images/banner.png" alt="PrevHam banner" width="600"/> -->
-
 # PrevHam
 
 **Compile-time Jetpack Compose Preview & mock data generation, powered by KSP.**
 
 Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Preview` function and its mock arguments for you — no runtime reflection, no boilerplate.
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.parkjiminnnn/prevham-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/io.github.parkjiminnnn)
 [![CI](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml/badge.svg)](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.2.10-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
@@ -26,22 +24,22 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 
 ## ✨ Features
 
-| Feature | Description | Status |
-|---|---|---|
-| `@Prev` annotation | Single annotation to trigger Preview generation | ✅ Done |
-| Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet | ✅ Done |
-| Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. | ✅ Done |
-| Data class mocks | Builds mock instances for flat data class parameters | ✅ Done |
-| Nullable support | Uses a real mock when possible, falls back to `null` otherwise | ✅ Done |
-| Collection support | Generates mock `List`, `Set`, `Map` values | ✅ Done |
-| Enum support | Picks a valid mock value from enum constants | ✅ Done |
-| Nested data classes | Recursive mock generation for nested data classes and collections (depth-limited) | ✅ Done |
-| Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) | ✅ Done |
-| Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types | ✅ Done |
-| Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) | ✅ Done |
-| Preview options | Dark mode, locale, font scale variants via `@Prev(darkMode, locales, fontScales)` | ✅ Done |
+| Feature | Description |
+|---|---|
+| `@Prev` annotation | Single annotation to trigger Preview generation |
+| Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet |
+| Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. |
+| Data class mocks | Builds mock instances for flat data class parameters |
+| Nullable support | Uses a real mock when possible, falls back to `null` otherwise |
+| Collection support | Generates mock `List`, `Set`, `Map` values |
+| Enum support | Picks a valid mock value from enum constants |
+| Nested data classes | Recursive mock generation for nested data classes and collections (depth-limited) |
+| Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
+| Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
+| Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
+| Preview options | Dark mode, locale, font scale variants via `@Prev(darkMode, locales, fontScales)` |
 
-> **Legend** — ✅ In progress · 🚧 Planned · See the full [Roadmap](#-roadmap) for release-by-release detail.
+> All features listed above shipped by v1.0 — see the [Roadmap](#-roadmap) for release-by-release detail.
 
 ---
 
@@ -229,11 +227,10 @@ flowchart LR
 - [x] Stable public API
 - [x] Maven Central publishing setup
 - [x] Automated release pipeline
-- [ ] Improved documentation
-- [ ] Sample project polish
+- [x] Improved documentation
+- [x] Sample project polish
 
 ---
-
 
 ## 📄 License
 
