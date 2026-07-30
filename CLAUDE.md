@@ -120,7 +120,7 @@ PrevHam
 
 ## Documentation Convention
 
-Whenever work in this project changes or adds functionality, features, module responsibilities, or architecture, `README.md` must be updated in the same change to stay in sync.
+Whenever work in this project changes or adds functionality, features, module responsibilities, or architecture, `README.md` and any affected files under `docs/` must be updated in the same change to stay in sync.
 
 This applies to (non-exhaustive):
 
