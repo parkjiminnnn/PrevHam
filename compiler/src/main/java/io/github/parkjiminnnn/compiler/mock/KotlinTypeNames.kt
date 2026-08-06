@@ -12,3 +12,18 @@ internal const val KOTLIN_SET_QUALIFIED_NAME = "kotlin.collections.Set"
 internal const val KOTLIN_MAP_QUALIFIED_NAME = "kotlin.collections.Map"
 internal val KOTLIN_COLLECTION_QUALIFIED_NAMES =
     setOf(KOTLIN_LIST_QUALIFIED_NAME, KOTLIN_SET_QUALIFIED_NAME, KOTLIN_MAP_QUALIFIED_NAME)
+
+internal const val KOTLIN_ANY_QUALIFIED_NAME = "kotlin.Any"
+internal const val KOTLIN_UNIT_QUALIFIED_NAME = "kotlin.Unit"
+
+// Flow types a mocked member can expose. MutableStateFlow(value) satisfies every one of them
+// (MutableStateFlow <: StateFlow <: SharedFlow <: Flow, and MutableStateFlow <: MutableSharedFlow),
+// so InterfaceMockGenerator can stub all of these with a single factory call.
+internal val KOTLINX_FLOW_QUALIFIED_NAMES =
+    setOf(
+        "kotlinx.coroutines.flow.Flow",
+        "kotlinx.coroutines.flow.SharedFlow",
+        "kotlinx.coroutines.flow.MutableSharedFlow",
+        "kotlinx.coroutines.flow.StateFlow",
+        "kotlinx.coroutines.flow.MutableStateFlow",
+    )

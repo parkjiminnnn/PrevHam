@@ -18,7 +18,7 @@ internal class DataClassMockGenerator(
         val declaration = type.declaration as KSClassDeclaration
         val parameters = type.substitutedConstructorParameters().orEmpty()
         val arguments = buildMockArguments(parameters, fieldRegistry)
-        return buildNamedArgumentsCall(declaration.simpleName.asString(), arguments)
+        return buildNamedArgumentsCall(declaration.toClassName(), arguments)
     }
 
     // For a generic data class (e.g. Box<T>), a constructor parameter's own declared type

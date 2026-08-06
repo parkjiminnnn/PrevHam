@@ -77,5 +77,8 @@ internal object Stubs {
             """,
         )
 
+    // kotlinx.coroutines and MockK need no stubs: both are real dependencies of this module's
+    // tests, so inheritClassPath makes them resolvable in compiled sources and in the code KSP
+    // generates from them.
     val all = listOf(prev, composable, preview, configuration, modifier)
 }
