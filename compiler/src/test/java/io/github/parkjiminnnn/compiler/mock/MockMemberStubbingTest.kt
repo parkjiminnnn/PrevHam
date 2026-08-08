@@ -328,6 +328,73 @@ class MockMemberStubbingTest {
     }
 
     @Test
+    fun `stubs any generic member, not just flows`() {
+        val result =
+            compilePrev(
+                SourceFile.kotlin(
+                    "GenericScreen.kt",
+                    """
+                    package test
+                    import androidx.compose.runtime.Composable
+                    import io.github.parkjiminnnn.runtime.Prev
+
+                    data class Item(val title: String)
+                    interface Box<T> { val item: T }
+                    interface Repository<T> { fun get(): T }
+
+                    class GenericViewModel {
+                        val box: Box<Item> get() = throw NotImplementedError()
+                        val repo: Repository<Item> get() = throw NotImplementedError()
+                    }
+
+                    @Prev
+                    @Composable
+                    fun GenericScreen(viewModel: GenericViewModel) {}
+                    """,
+                ),
+            )
+
+        assertEquals(result.messages, KotlinCompilation.ExitCode.OK, result.exitCode)
+        val generated = requireNotNull(result.generatedFile("GenericScreenPreview.kt"))
+        // The erased-return-type problem belongs to any member whose type is a type parameter, so
+        // the nested mocks get their own stubs rather than being left bare. StateFlow is only the
+        // shape it was first reported through.
+        assertTrue(generated, generated.contains("every { box } returns mockk<Box<Item>>(relaxed = true) {"))
+        assertTrue(generated, generated.contains("every { item } returns Item("))
+        assertTrue(generated, generated.contains("every { repo } returns mockk<Repository<Item>>(relaxed = true) {"))
+        assertTrue(generated, generated.contains("every { get() } returns Item("))
+    }
+
+    @Test
+    fun `stubs a nullable data class member with a real instance`() {
+        val result =
+            compilePrev(
+                SourceFile.kotlin(
+                    "OptionalScreen.kt",
+                    """
+                    package test
+                    import androidx.compose.runtime.Composable
+                    import io.github.parkjiminnnn.runtime.Prev
+
+                    data class Item(val title: String)
+
+                    class OptionalViewModel {
+                        val item: Item? get() = null
+                    }
+
+                    @Prev
+                    @Composable
+                    fun OptionalScreen(viewModel: OptionalViewModel) {}
+                    """,
+                ),
+            )
+
+        assertEquals(result.messages, KotlinCompilation.ExitCode.OK, result.exitCode)
+        val generated = requireNotNull(result.generatedFile("OptionalScreenPreview.kt"))
+        assertTrue(generated, generated.contains("every { item } returns Item("))
+    }
+
+    @Test
     fun `stops stubbing once a nested mock reaches the depth limit`() {
         val result =
             compilePrev(

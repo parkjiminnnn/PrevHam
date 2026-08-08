@@ -30,7 +30,12 @@ internal class DataClassMockGenerator(
         val declaration = declaration as? KSClassDeclaration ?: return null
         if (Modifier.DATA !in declaration.modifiers) return null
         val constructor = declaration.primaryConstructor ?: return null
-        val substitutedTypes = constructor.asMemberOf(this).parameterTypes
+        // asMemberOf() rejects a nullable containing type outright ("Item? is not a sub type of
+        // the class/interface that contains <init>"), which would fail the whole KSP round rather
+        // than this one type. A nullable data class should still get a real instance where one can
+        // be built - null is NullableFallbackMockGenerator's last resort, not the first answer -
+        // so ask about the non-null form.
+        val substitutedTypes = constructor.asMemberOf(makeNotNullable()).parameterTypes
         if (substitutedTypes.size != constructor.parameters.size) return null
         return constructor.parameters.zip(substitutedTypes).map { (parameter, type) ->
             parameter.toMockParameter(type ?: return null) ?: return null
