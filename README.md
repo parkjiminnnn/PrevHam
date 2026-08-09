@@ -34,6 +34,8 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Enum support | Picks a valid mock value from enum constants |
 | Nested data classes | Recursive mock generation for nested data classes and collections (depth-limited) |
 | Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
+| Sealed type support | Builds a real subtype (e.g. `UiState.Loading`) instead of mocking the sealed type |
+| Mock member stubbing | Stubs a mock's properties and functions up front — including `StateFlow`/`Flow` members — so Preview rendering never depends on MockK's recursive relaxed mocking |
 | Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
 | Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
 | Preview options | Dark mode, locale, font scale variants via `@Prev(darkMode, locales, fontScales)` |

@@ -39,9 +39,5 @@ internal class FunctionTypeMockGenerator(
         return List(parameterCount) { "_" }.joinToString(", ", postfix = " -> ")
     }
 
-    private fun KSType.isUnit(): Boolean = declaration.qualifiedName?.asString() == UNIT_QUALIFIED_NAME
-
-    private companion object {
-        const val UNIT_QUALIFIED_NAME = "kotlin.Unit"
-    }
+    private fun KSType.isUnit(): Boolean = declaration.qualifiedName?.asString() == KOTLIN_UNIT_QUALIFIED_NAME
 }
