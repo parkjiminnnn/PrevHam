@@ -19,12 +19,12 @@ allowed to be unsupported — the generated call simply omits them and lets the 
 
 ## What types aren't supported today?
 
-- **Types nested more than 3 levels deep.** `MockGeneratorRegistry.default()` bounds recursion at
-  `MAX_DEPTH = 3` specifically to avoid a `StackOverflowError` on self-referential or very deeply
-  nested types (`data class Node(val next: Node?)`, `List<List<List<List<Int>>>>`, ...). A type that's
-  still "container-shaped" (a data class, collection, or function type) at that depth is treated as
-  unsupported. See [`mock-generation.md`](mock-generation.md#depth-limited-recursion) for why this is
-  a structural limit rather than a special case.
+- **A type that has to contain an instance of itself**, like `data class Node(val next: Node)`. No
+  value of that type can be constructed in ordinary code either. Recursion stops wherever a type is
+  about to be expanded a second time on the same path, and where the stop lands on something that
+  needs no expansion the mock is still built — `data class Node(val value: Int, val next: Node?)`
+  becomes `Node(value = 1, next = null)`. There is **no depth limit**: nesting can go as deep as the
+  model does. See [`mock-generation.md`](mock-generation.md#bounding-recursion-cycle-detection-not-depth).
 - **Generic types with unresolvable type arguments**, e.g. a star projection like `Repository<*>`.
   `InterfaceMockGenerator` can't determine a concrete type to write inside `mockk<...>()` for these,
   so it reports the type as unsupported rather than emitting code that wouldn't compile.
@@ -90,14 +90,15 @@ ordinary JVM unit test.
 Some members are still left to relaxed mode, and a composable reading a generic member off *those* can
 still hit this crash:
 
-- **Members deeper than the recursion limit.** Stubbing a member means building a value for it, and
-  the generators that build values are dropped once `MAX_DEPTH` is reached. In a chain like
-  `Outer.middle` → `Middle.inner` → `Inner.items: StateFlow<Item>`, the innermost mock comes out bare,
-  because `Item` can't be built at that depth. Tracked in issue #60 — raising the limit shrinks this
-  hole but can't remove it, since any limit has a boundary. Note that member stubbing itself spends
-  recursion depth, so a long chain of interfaces now reaches the limit sooner than it used to.
 - **`vararg` functions, generic functions, non-public members, and types no generator supports** (see
   the list above).
+- **A member whose type is already being expanded further up the chain.** Recursion has to stop
+  somewhere, and that mock comes out bare.
+
+A long chain of interfaces is no longer one of these. `Outer.middle` → `Middle.inner` →
+`Inner.items: StateFlow<Item>` used to leave the innermost mock bare once the old depth limit ran
+out, which put this crash back within reach; nothing there revisits a type, so it is now stubbed all
+the way down (issue #60).
 
 Extracting a stateless composable that takes the resolved state directly, and putting `@Prev` on that,
 avoids all of it — and is the better Compose shape regardless.

@@ -9,6 +9,7 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
+import io.github.parkjiminnnn.compiler.mock.MockContext
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
 import io.github.parkjiminnnn.compiler.mock.buildMockArguments
 import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
@@ -54,7 +55,8 @@ internal class PrevSymbolProcessor(
 
     private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
         val parameters = function.parameters.mapNotNull { it.toMockParameter() }
-        val unsupported = firstUnsupportedParameter(parameters, mockGenerators)
+        val context = MockContext.root(mockGenerators)
+        val unsupported = firstUnsupportedParameter(parameters, context)
         if (unsupported != null) {
             logger.warn(
                 "[PrevHam] skipping @Prev on '${function.simpleName.asString()}': " +
@@ -63,7 +65,7 @@ internal class PrevSymbolProcessor(
             )
             return null
         }
-        return buildMockArguments(parameters, mockGenerators)
+        return buildMockArguments(parameters, context)
     }
 
     private fun KSFunctionDeclaration.isComposable(): Boolean =

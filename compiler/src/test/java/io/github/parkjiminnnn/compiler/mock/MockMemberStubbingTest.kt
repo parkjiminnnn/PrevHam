@@ -300,7 +300,7 @@ class MockMemberStubbingTest {
     }
 
     @Test
-    fun `bounds stubbing of a self-referential type at the depth limit`() {
+    fun `bounds stubbing of a self-referential type`() {
         val result =
             compilePrev(
                 SourceFile.kotlin(
@@ -321,10 +321,10 @@ class MockMemberStubbingTest {
 
         assertEquals(result.messages, KotlinCompilation.ExitCode.OK, result.exitCode)
         val generated = requireNotNull(result.generatedFile("NodeScreenPreview.kt"))
-        // Each nested mock is one registry deeper, so the chain has to stop at MAX_DEPTH with a
-        // mock that stubs nothing - otherwise generation would recurse forever.
-        assertEquals(generated, 4, generated.split("mockk<Node>(relaxed = true)").size - 1)
-        assertEquals(generated, 3, generated.split("every { next }").size - 1)
+        // Stubbing `next` re-enters Node, which is already being expanded, so the chain stops one
+        // level down with a mock that stubs nothing - otherwise generation would run forever.
+        assertEquals(generated, 2, generated.split("mockk<Node>(relaxed = true)").size - 1)
+        assertEquals(generated, 1, generated.split("every { next }").size - 1)
     }
 
     @Test
@@ -395,7 +395,7 @@ class MockMemberStubbingTest {
     }
 
     @Test
-    fun `stops stubbing once a nested mock reaches the depth limit`() {
+    fun `keeps stubbing all the way down a long interface chain`() {
         val result =
             compilePrev(
                 SourceFile.kotlin(
@@ -422,11 +422,10 @@ class MockMemberStubbingTest {
         val generated = requireNotNull(result.generatedFile("DeepScreenPreview.kt"))
         assertTrue(generated, generated.contains("every { middle } returns"))
         assertTrue(generated, generated.contains("every { inner } returns"))
-        // Known limitation, not an accident: stubbing `items` means building an `Item`, and the
-        // registry at this depth no longer has DataClassMockGenerator. So `Inner` is left as a bare
-        // relaxed mock, and reading `outer.middle.inner.items.value` still hits the erased-generic
-        // crash this class exists to prevent. Bounded by MAX_DEPTH - see issue #60.
-        assertFalse(generated, generated.contains("every { items }"))
+        // The innermost member used to be left bare because the chain had spent the depth budget,
+        // which put the issue #59 crash back within reach. Nothing here revisits a type, so there
+        // is no longer anything to run out of.
+        assertTrue(generated, generated.contains("every { items } returns MutableStateFlow(Item("))
     }
 
     @Test

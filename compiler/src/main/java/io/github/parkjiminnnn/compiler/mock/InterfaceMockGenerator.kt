@@ -33,10 +33,11 @@ import com.squareup.kotlinpoet.TypeName
  * whatever is left - the members whose types no generator supports, and anything inherited that
  * isn't enumerated here.
  */
-internal class InterfaceMockGenerator(
-    private val memberRegistry: MockGeneratorRegistry?,
-) : MockGenerator {
-    override fun supports(type: KSType): Boolean {
+internal class InterfaceMockGenerator : MockGenerator {
+    override fun supports(
+        type: KSType,
+        context: MockContext,
+    ): Boolean {
         val declaration = type.declaration as? KSClassDeclaration ?: return false
         if (declaration.isOwnedByAnotherGenerator()) return false
         val isMockableKind =
@@ -45,13 +46,16 @@ internal class InterfaceMockGenerator(
         return isMockableKind && type.toTypeName() != null
     }
 
-    override fun generate(type: KSType): CodeBlock {
+    override fun generate(
+        type: KSType,
+        context: MockContext,
+    ): CodeBlock {
         val declaration = type.declaration as KSClassDeclaration
         val rawClassName = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
         declaration.selfImplementingCompanionMock(rawClassName)?.let { return it }
 
         val mockCall = CodeBlock.of("%M<%T>(relaxed = true)", MOCKK_FUNCTION, type.toTypeName())
-        val stubs = declaration.memberStubs(type)
+        val stubs = declaration.memberStubs(type, context)
         if (stubs.isEmpty()) return mockCall
 
         // mockk()'s trailing lambda is applied to the new mock, so the stubs read as
@@ -67,31 +71,31 @@ internal class InterfaceMockGenerator(
             .build()
     }
 
-    private fun KSClassDeclaration.memberStubs(containing: KSType): List<CodeBlock> {
-        val registry = memberRegistry ?: return emptyList()
-        return propertyStubs(containing, registry) + functionStubs(containing, registry)
-    }
+    private fun KSClassDeclaration.memberStubs(
+        containing: KSType,
+        context: MockContext,
+    ): List<CodeBlock> = propertyStubs(containing, context) + functionStubs(containing, context)
 
     private fun KSClassDeclaration.propertyStubs(
         containing: KSType,
-        registry: MockGeneratorRegistry,
+        context: MockContext,
     ): List<CodeBlock> =
         getAllProperties()
             .filter { it.isStubbable() }
             .mapNotNull { property ->
-                val value = registry.stubValue(property.asMemberOf(containing)) ?: return@mapNotNull null
+                val value = context.stubValue(property.asMemberOf(containing)) ?: return@mapNotNull null
                 CodeBlock.of("%M { %L } returns %L\n", EVERY_FUNCTION, property.simpleName.asString(), value)
             }.toList()
 
     private fun KSClassDeclaration.functionStubs(
         containing: KSType,
-        registry: MockGeneratorRegistry,
+        context: MockContext,
     ): List<CodeBlock> =
         getAllFunctions()
             .filter { it.isStubbable() }
             .mapNotNull { function ->
                 val returnType = function.asMemberOf(containing).returnType ?: return@mapNotNull null
-                val value = registry.stubValue(returnType) ?: return@mapNotNull null
+                val value = context.stubValue(returnType) ?: return@mapNotNull null
                 // An argument matcher per parameter: PrevHam can't know which arguments the
                 // previewed code will pass, so every call gets the same stubbed value.
                 val matchers = function.parameters.joinToString { "any()" }
@@ -123,11 +127,11 @@ internal class InterfaceMockGenerator(
 
     // The value to stub a member with, or null to leave that member to relaxed mode - either
     // because there is nothing worth stubbing (Unit) or because no generator can build its type.
-    private fun MockGeneratorRegistry.stubValue(type: KSType): CodeBlock? {
+    private fun MockContext.stubValue(type: KSType): CodeBlock? {
         val qualifiedName = type.declaration.qualifiedName?.asString()
         if (qualifiedName == KOTLIN_UNIT_QUALIFIED_NAME) return null
         if (qualifiedName !in KOTLINX_FLOW_QUALIFIED_NAMES) {
-            return if (supports(type)) generate(type) else null
+            return if (canMock(type)) mock(type) else null
         }
         // A Flow is only ever read for the values it emits, so stub it with a real flow holding a
         // mock element rather than mocking the flow itself.
@@ -136,8 +140,8 @@ internal class InterfaceMockGenerator(
                 .singleOrNull()
                 ?.type
                 ?.resolve() ?: return null
-        if (!supports(element)) return null
-        return CodeBlock.of("%M(%L)", MUTABLE_STATE_FLOW_FUNCTION, generate(element))
+        if (!canMock(element)) return null
+        return CodeBlock.of("%M(%L)", MUTABLE_STATE_FLOW_FUNCTION, mock(element))
     }
 
     // Some interfaces (e.g. androidx.compose.ui.Modifier) declare a companion object that

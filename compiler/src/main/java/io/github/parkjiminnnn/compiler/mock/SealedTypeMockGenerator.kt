@@ -24,18 +24,22 @@ import com.squareup.kotlinpoet.CodeBlock
  * Must be registered ahead of [InterfaceMockGenerator], which would otherwise claim sealed
  * interfaces and sealed classes as ordinary mockable types.
  */
-internal class SealedTypeMockGenerator(
-    private val subtypeRegistry: MockGeneratorRegistry?,
-) : MockGenerator {
-    override fun supports(type: KSType): Boolean = type.firstMockableSubtype() != null
+internal class SealedTypeMockGenerator : MockGenerator {
+    override fun supports(
+        type: KSType,
+        context: MockContext,
+    ): Boolean = type.firstMockableSubtype(context) != null
 
-    override fun generate(type: KSType): CodeBlock {
-        val subtype = type.firstMockableSubtype()!!
+    override fun generate(
+        type: KSType,
+        context: MockContext,
+    ): CodeBlock {
+        val subtype = type.firstMockableSubtype(context)!!
         if (subtype.classKind == ClassKind.OBJECT) return CodeBlock.of("%T", subtype.toClassName())
-        return subtypeRegistry!!.generate(subtype.asStarProjectedType())
+        return context.mock(subtype.asStarProjectedType())
     }
 
-    private fun KSType.firstMockableSubtype(): KSClassDeclaration? {
+    private fun KSType.firstMockableSubtype(context: MockContext): KSClassDeclaration? {
         val declaration = declaration as? KSClassDeclaration ?: return null
         if (Modifier.SEALED !in declaration.modifiers) return null
         // A generic sealed type's subtypes would need their type arguments substituted, which
@@ -45,17 +49,16 @@ internal class SealedTypeMockGenerator(
             .getSealedSubclasses()
             // getSealedSubclasses() promises no particular order - not even declaration order - so
             // sort to keep generated code reproducible. Object subtypes sort first: they need
-            // nothing constructed, so they can't be turned away by the depth limit, and they
+            // nothing constructed, so they can't be turned away by a recursion bound, and they
             // introduce no invented field values into the preview.
             .sortedWith(compareBy({ it.classKind != ClassKind.OBJECT }, { it.simpleName.asString() }))
-            .firstOrNull { it.isMockable() }
+            .firstOrNull { it.isMockable(context) }
     }
 
-    private fun KSClassDeclaration.isMockable(): Boolean {
+    private fun KSClassDeclaration.isMockable(context: MockContext): Boolean {
         if (typeParameters.isNotEmpty()) return false
-        // An object subtype is just a reference, so it stays available even at the depth limit,
-        // where there is no nested registry to build constructor arguments with.
+        // An object subtype is just a reference, so it needs no further expansion at all.
         if (classKind == ClassKind.OBJECT) return true
-        return subtypeRegistry?.supports(asStarProjectedType()) == true
+        return context.canMock(asStarProjectedType())
     }
 }

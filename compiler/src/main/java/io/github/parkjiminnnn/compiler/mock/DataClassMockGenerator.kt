@@ -6,18 +6,22 @@ import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.buildNamedArgumentsCall
 
-internal class DataClassMockGenerator(
-    private val fieldRegistry: MockGeneratorRegistry,
-) : MockGenerator {
-    override fun supports(type: KSType): Boolean {
+internal class DataClassMockGenerator : MockGenerator {
+    override fun supports(
+        type: KSType,
+        context: MockContext,
+    ): Boolean {
         val parameters = type.substitutedConstructorParameters() ?: return false
-        return firstUnsupportedParameter(parameters, fieldRegistry) == null
+        return firstUnsupportedParameter(parameters, context) == null
     }
 
-    override fun generate(type: KSType): CodeBlock {
+    override fun generate(
+        type: KSType,
+        context: MockContext,
+    ): CodeBlock {
         val declaration = type.declaration as KSClassDeclaration
         val parameters = type.substitutedConstructorParameters().orEmpty()
-        val arguments = buildMockArguments(parameters, fieldRegistry)
+        val arguments = buildMockArguments(parameters, context)
         return buildNamedArgumentsCall(declaration.toClassName(), arguments)
     }
 

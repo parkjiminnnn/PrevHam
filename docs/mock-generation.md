@@ -33,8 +33,11 @@ the same type.
 
 ```kotlin
 internal class MockGeneratorRegistry(private val generators: List<MockGenerator>) {
-    fun supports(type: KSType): Boolean = generators.any { it.supports(type) }
-    fun generate(type: KSType): CodeBlock = generators.first { it.supports(type) }.generate(type)
+    fun supports(type: KSType, context: MockContext): Boolean =
+        generators.any { it.supports(type, context) }
+
+    fun generate(type: KSType, context: MockContext): CodeBlock =
+        generators.first { it.supports(type, context) }.generate(type, context)
 }
 ```
 
@@ -58,62 +61,72 @@ real design constraint, not cosmetic:
   `"mock"` value from `StringMockGenerator` when possible; `null` is only the fallback when nothing
   else in the registry supports the (nullable) type.
 
-## Depth-limited recursion
+## Bounding recursion: cycle detection, not depth
 
-`DataClassMockGenerator`, `CollectionMockGenerator`, and `FunctionTypeMockGenerator` are all
-*recursive* — mocking a `data class Order(val address: Address)` requires mocking `Address` too, which
-might itself contain further nested types. Left unchecked, a self-referential type
-(`data class Node(val next: Node?)`) or a very deeply nested one would recurse forever and overflow the
-stack.
+`DataClassMockGenerator`, `CollectionMockGenerator`, `FunctionTypeMockGenerator`, and
+`InterfaceMockGenerator`'s member stubbing are all *recursive* — mocking a
+`data class Order(val address: Address)` requires mocking `Address` too, which might itself contain
+further nested types. Left unchecked, a self-referential type (`data class Node(val next: Node)`)
+would recurse forever and overflow the stack.
 
-`MockGeneratorRegistry.default()` bounds this by building a **chain of registries**, one per recursion
-depth, rather than one flat registry:
+This used to be bounded by a depth counter, `MAX_DEPTH = 3`. The trouble with counting depth is that
+it can't tell *infinite* from merely *deep*: a perfectly ordinary
+`Success → Organization → Festival → List<Poster>` was rejected at the fourth level for having no
+cycle in it whatsoever (issue #60). Whatever number is chosen, some real model exceeds it.
+
+Recursion is bounded by the path instead. `MockContext` carries the set of types currently being
+expanded, and descending into one already on that set produces a **blocked** context rather than a
+deeper one:
 
 ```kotlin
-companion object {
-    private const val MAX_DEPTH = 3
-
-    fun default(): MockGeneratorRegistry = build(depth = 0)
-
-    private fun build(depth: Int): MockGeneratorRegistry {
-        val nested = if (depth >= MAX_DEPTH) null else build(depth + 1)
-        val generators =
-            buildList {
-                add(PrimitiveMockGenerator())
-                add(StringMockGenerator())
-                add(EnumMockGenerator())
-                add(SealedTypeMockGenerator(nested))
-                if (nested != null) {
-                    add(DataClassMockGenerator(nested))
-                    add(CollectionMockGenerator(nested))
-                    add(FunctionTypeMockGenerator(nested))
-                }
-                add(InterfaceMockGenerator(nested))
-                add(NullableFallbackMockGenerator())
-            }
-        return MockGeneratorRegistry(generators)
+internal class MockContext private constructor(
+    private val registry: MockGeneratorRegistry,
+    private val expanding: Set<String>,
+    private val remainingSteps: Int,
+    private val isBlocked: Boolean,
+) {
+    fun canMock(type: KSType): Boolean {
+        if (isBlocked) return false
+        return registry.supports(type, descend(type))
     }
+
+    fun mock(type: KSType): CodeBlock = registry.generate(type, descend(type))
 }
 ```
 
-Each recursive generator is constructed with a *nested* registry — one level deeper — as the source of
-mocks for its inner elements (`DataClassMockGenerator`'s field types, `CollectionMockGenerator`'s
-element type, `FunctionTypeMockGenerator`'s return type, `InterfaceMockGenerator`'s member stubs). At
-`depth >= MAX_DEPTH` there is no nested registry, so `DataClassMockGenerator`,
-`CollectionMockGenerator`, and `FunctionTypeMockGenerator` are left out entirely: a type that's still
-"container-shaped" at that depth simply isn't supported by any generator in that registry, and
-`supports()` returns `false` all the way back up the chain. The processor then treats the top-level
-parameter as unsupported and skips generating a Preview for that function (with a logged warning),
-rather than crashing the build.
+Recursive generators hold no registry of their own; they call `context.canMock(inner)` /
+`context.mock(inner)`, and the context passes the work back to the registry with the path extended.
+So the registry is a single flat list — no depth-indexed chain, no "this generator is a leaf so it
+survives to the bottom" special cases.
 
-Two generators take the nested registry as *nullable* and stay in the list at every depth, because
-they still have something useful to emit without one — `SealedTypeMockGenerator` can reference an
-`object` subtype, and `InterfaceMockGenerator` can emit a bare relaxed mock. They just do less at the
-limit: no constructed subtype, and no member stubs.
+A blocked context answers `canMock` with `false` for everything, **without consulting the
+registry** — that is what stops the recursion, and what stops `supports()` from recursing while
+deciding. It is deliberately not the same as failing outright: generators that expand nothing still
+answer at that point, so a nullable field falls back to `null`, a primitive to its literal, an
+interface to a bare relaxed mock. Stopping should cost one member, not the whole parameter:
 
-This bounds recursion depth structurally (by which registry a call reaches) rather than with an
-explicit counter threaded through every generator — a flat type used at depth 0 never even reaches the
-deeper registries, so the common case pays no extra cost.
+```kotlin
+data class Node(val value: Int, val next: Node?)   // Node(value = 1, next = null)
+data class Node(val next: Node)                    // skipped - no such value exists in any code
+interface Node { val next: Node }                  // mockk { every { next } returns mockk() }
+```
+
+The path key carries type arguments, not just the declaration. Keyed on the declaration alone, the
+outer and inner `Box` of a finite `Box<Box<Item>>` would look like the same type and be rejected.
+Nullability is left out on purpose: `Node` and `Node?` are the same type to recurse into, and
+treating them as distinct would let `data class Node(val next: Node?)` alternate between them
+forever.
+
+One case cycle detection can't catch is a generic type whose argument grows on every step:
+
+```kotlin
+data class Wrapper<T>(val inner: Wrapper<Wrapper<T>>)
+```
+
+Each step produces a type never seen before, so no key ever repeats. No value of that type can be
+constructed in ordinary code either, but the declaration is legal and must not hang the build, so
+`MAX_PATH_LENGTH` caps the path at 64. That is a safety net for pathological declarations, not a
+supported nesting limit — real models are nowhere near it.
 
 ## `MockParameter`: decoupling "what to mock" from "how its type was found"
 
@@ -139,7 +152,7 @@ allowed to be skipped when unsupported, since the generated call can simply omit
 
 **`DataClassMockGenerator`** requires the `Modifier.DATA` modifier (interfaces and plain classes are
 explicitly out of scope here — they're `InterfaceMockGenerator`'s job) and a primary constructor. It
-recurses into each constructor parameter via the nested registry, then emits a named-argument
+recurses into each constructor parameter through the context, then emits a named-argument
 constructor call built by the shared `buildNamedArgumentsCall` helper (also used for the generated
 Preview function's own call to the original composable).
 
@@ -154,8 +167,8 @@ chosen here and written into the file, with the same mock values every other gen
 
 Which subtype gets built has to be stable across builds, and `getSealedSubclasses()` promises no
 particular order — not even declaration order. So candidates are sorted explicitly: `object` subtypes
-first (they need nothing constructed, so the depth limit can't turn them away, and they introduce no
-invented field values), then by simple name. The first one the nested registry can actually build
+first (they need nothing constructed, so a blocked context can't turn them away, and they introduce
+no invented field values), then by simple name. The first one the context can actually build
 wins. Generic sealed types are left to `InterfaceMockGenerator`, since substituting their subtypes'
 type arguments isn't something `asStarProjectedType()` can do.
 
@@ -205,17 +218,17 @@ parameters (its return type would still mention them), or when it takes a `varar
 a spread of the matcher for its exact element type, `*anyLongVararg()` / `*anyVararg()` / …, and
 guessing wrong emits a stub that doesn't compile). `equals`/`hashCode`/`toString` are skipped too —
 MockK relies on its own answers for those. Member types are resolved through `asMemberOf`, so a
-`Holder<String>`'s `val value: T` is stubbed with `"mock"`, not left unresolved. Because stubbing runs
-through the *nested* registry, a self-referential interface (`interface Node { val next: Node }`)
-terminates at `MAX_DEPTH` with a mock that stubs nothing.
+`Holder<String>`'s `val value: T` is stubbed with `"mock"`, not left unresolved. Because stubbing
+descends through the context, a self-referential interface (`interface Node { val next: Node }`)
+stops one level down with a mock that stubs nothing.
 
 **`CollectionMockGenerator`** matches `List`/`Set`/`Map` by qualified name, resolves each type
-argument via the nested registry, and picks `listOf`/`setOf`/`mapOf` accordingly. `Map`'s two type
+argument through the context, and picks `listOf`/`setOf`/`mapOf` accordingly. `Map`'s two type
 arguments (`K`, `V`) are paired with Kotlin's `to` infix function into a single `Pair` argument.
 
 **`FunctionTypeMockGenerator`** matches any `kotlin.FunctionN` type. A lambda literal doesn't need to
 reference its parameters to satisfy a function-type signature, so the same `{ }` (for `Unit`-returning
-functions) or `{ <mock> }` (recursing into the return type via the nested registry) body is valid
+functions) or `{ <mock> }` (recursing into the return type through the context) body is valid
 regardless of how many parameters the function type declares — `() -> Boolean` and
 `(String, Int) -> Boolean` both just need *some* expression producing a `Boolean` as their last line.
 
