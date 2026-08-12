@@ -3,18 +3,25 @@ package io.github.parkjiminnnn.compiler.mock
 import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.CodeBlock
 
-internal class CollectionMockGenerator(
-    private val elementRegistry: MockGeneratorRegistry,
-) : MockGenerator {
-    override fun supports(type: KSType): Boolean {
-        val elements = type.resolveTypeArguments() ?: return false
-        return elements.all { elementRegistry.supports(it) }
-    }
+internal class CollectionMockGenerator : MockGenerator {
+    // An element the context can't build doesn't make the collection unmockable: unlike a data
+    // class, which has no value at all without its constructor arguments, a collection has an
+    // empty one. That is what keeps a recursive shape like `data class Tree(val children:
+    // List<Tree>)` previewable - `Tree(children = listOf())` is exactly what such a tree's leaf
+    // looks like, and rejecting it would cost the whole composable its Preview.
+    override fun supports(
+        type: KSType,
+        context: MockContext,
+    ): Boolean = type.resolveTypeArguments() != null
 
-    override fun generate(type: KSType): CodeBlock {
+    override fun generate(
+        type: KSType,
+        context: MockContext,
+    ): CodeBlock {
         val elements = type.resolveTypeArguments().orEmpty()
-        val mocks = elements.map { elementRegistry.generate(it) }
         val factoryName = FACTORY_NAMES.getValue(type.qualifiedName()!!)
+        if (elements.any { !context.canMock(it) }) return CodeBlock.of("%L()", factoryName)
+        val mocks = elements.map { context.mock(it) }
         val argument = if (mocks.size == 2) CodeBlock.of("%L to %L", mocks[0], mocks[1]) else mocks[0]
         return CodeBlock.of("%L(%L)", factoryName, argument)
     }

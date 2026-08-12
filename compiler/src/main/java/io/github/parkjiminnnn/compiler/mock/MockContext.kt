@@ -1,0 +1,75 @@
+package io.github.parkjiminnnn.compiler.mock
+
+import com.google.devtools.ksp.symbol.KSType
+import com.squareup.kotlinpoet.CodeBlock
+
+/**
+ * The path a mock generator is currently on, and the way to descend one step further along it.
+ *
+ * Recursive generators don't hold a registry of their own; they ask their context to mock an inner
+ * type ([canMock] / [mock]), and the context hands the work back to the registry with the path
+ * extended by the type it just entered. That path is what bounds recursion.
+ *
+ * Descending into a type already on the path produces a *blocked* context instead of a deeper one.
+ * A blocked context answers [canMock] with `false` for everything, without consulting the registry,
+ * so a generator that needs to expand something reports the type as unsupported and the recursion
+ * ends there. Generators that don't expand anything still work at that point: a nullable field
+ * falls back to `null`, a primitive to its literal, an interface to a bare relaxed mock. That
+ * matters - stopping the recursion should cost as little as possible, not fail the whole parameter.
+ *
+ * Every value here is immutable and copied on descent, so [canMock] stays free of side effects and
+ * always agrees with what [mock] will do for the same type.
+ */
+internal class MockContext private constructor(
+    private val registry: MockGeneratorRegistry,
+    private val expanding: Set<String>,
+    private val remainingSteps: Int,
+    private val isBlocked: Boolean,
+) {
+    /** Whether an inner type can be mocked from here, without expanding it. */
+    fun canMock(type: KSType): Boolean {
+        if (isBlocked) return false
+        return registry.supports(type, descend(type))
+    }
+
+    /** The mock for an inner type. Only valid when [canMock] returned true for the same type. */
+    fun mock(type: KSType): CodeBlock = registry.generate(type, descend(type))
+
+    private fun descend(type: KSType): MockContext {
+        val key = type.pathKey()
+        // Entering a type already being expanded on this path would recurse forever - this is the
+        // `data class Node(val next: Node)` case. Anything finite, however deeply nested, never
+        // repeats a key and runs to completion.
+        if (remainingSteps == 0 || key in expanding) {
+            return MockContext(registry, expanding, remainingSteps = 0, isBlocked = true)
+        }
+        return MockContext(registry, expanding + key, remainingSteps - 1, isBlocked = false)
+    }
+
+    // Type arguments belong in the key: keyed on the declaration alone, the outer and inner Box of
+    // a perfectly finite Box<Box<Item>> would look like the same type and be rejected. Nullability
+    // is deliberately left out - Node and Node? are the same type to recurse into, and treating
+    // them as distinct would let `data class Node(val next: Node?)` alternate between them forever.
+    private fun KSType.pathKey(): String {
+        val name = declaration.qualifiedName?.asString() ?: declaration.simpleName.asString()
+        if (arguments.isEmpty()) return name
+        return arguments.joinToString(prefix = "$name<", postfix = ">") {
+            it.type
+                ?.resolve()
+                ?.pathKey() ?: "*"
+        }
+    }
+
+    companion object {
+        // Cycle detection covers self-reference, but not a generic type whose argument grows on
+        // every step - `data class Wrapper<T>(val inner: Wrapper<Wrapper<T>>)` produces a type
+        // never seen before each time, so no key ever repeats. Such a type can't be instantiated in
+        // ordinary code either, but the declaration is legal and must not hang the build. This is
+        // the safety net for that, set far beyond anything a real model reaches; it is not a
+        // supported depth limit.
+        const val MAX_PATH_LENGTH = 64
+
+        fun root(registry: MockGeneratorRegistry): MockContext =
+            MockContext(registry, expanding = emptySet(), remainingSteps = MAX_PATH_LENGTH, isBlocked = false)
+    }
+}

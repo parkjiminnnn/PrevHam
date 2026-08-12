@@ -3,25 +3,29 @@ package io.github.parkjiminnnn.compiler.mock
 import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.CodeBlock
 
-internal class FunctionTypeMockGenerator(
-    private val returnTypeRegistry: MockGeneratorRegistry,
-) : MockGenerator {
-    override fun supports(type: KSType): Boolean {
+internal class FunctionTypeMockGenerator : MockGenerator {
+    override fun supports(
+        type: KSType,
+        context: MockContext,
+    ): Boolean {
         val returnType = type.functionReturnType() ?: return false
-        return returnType.isUnit() || returnTypeRegistry.supports(returnType)
+        return returnType.isUnit() || context.canMock(returnType)
     }
 
     // Kotlin infers a 0- or 1-parameter lambda without a declared parameter list (the single
     // parameter is available as the implicit `it` even when unused), but requires 2+ parameter
     // function types to at least name every parameter, even if unused - otherwise the lambda is
     // inferred as Function0 and fails to satisfy the actual function type. See issue #37.
-    override fun generate(type: KSType): CodeBlock {
+    override fun generate(
+        type: KSType,
+        context: MockContext,
+    ): CodeBlock {
         val returnType = type.functionReturnType()!!
         val parameterNames = type.lambdaParameterNames()
         return if (returnType.isUnit()) {
             CodeBlock.of("{ %L}", parameterNames)
         } else {
-            CodeBlock.of("{ %L%L }", parameterNames, returnTypeRegistry.generate(returnType))
+            CodeBlock.of("{ %L%L }", parameterNames, context.mock(returnType))
         }
     }
 

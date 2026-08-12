@@ -10,45 +10,49 @@ Every generator lives in `compiler/src/main/java/io/github/parkjiminnnn/compiler
 
 ```kotlin
 internal interface MockGenerator {
-    fun supports(type: KSType): Boolean
-    fun generate(type: KSType): CodeBlock
+    fun supports(type: KSType, context: MockContext): Boolean
+    fun generate(type: KSType, context: MockContext): CodeBlock
 }
 ```
 
-- `supports(type)` must be a pure check — no side effects, safe to call speculatively. Match on
-  `type.declaration.qualifiedName?.asString()` for a specific known type (see
+- `supports(type, context)` must be a pure check — no side effects, safe to call speculatively. Match
+  on `type.declaration.qualifiedName?.asString()` for a specific known type (see
   `StringMockGenerator`), or on structural shape (`ClassKind`, `Modifier.DATA`, `type.arguments`, ...)
   for a family of types (see `EnumMockGenerator`, `DataClassMockGenerator`).
-- `generate(type)` is only ever called after `supports(type)` returned `true` for the same `type` —
-  it can assume that precondition and doesn't need to re-validate it.
+- `generate(type, context)` is only ever called after `supports` returned `true` for the same
+  arguments — it can assume that precondition and doesn't need to re-validate it.
 - If your generator needs to recurse into other types (a field type, a collection element type, a
-  function's return type), take a `MockGeneratorRegistry` as a constructor parameter and delegate to
-  it rather than hardcoding a specific generator — see `DataClassMockGenerator`,
-  `CollectionMockGenerator`, and `FunctionTypeMockGenerator` for the pattern. This is what makes the
-  depth-limiting in `MockGeneratorRegistry.default()` work correctly for your generator too.
+  function's return type), go through the context — `context.canMock(inner)` in `supports`, and
+  `context.mock(inner)` in `generate` — rather than hardcoding a specific generator. See
+  `DataClassMockGenerator`, `CollectionMockGenerator`, and `FunctionTypeMockGenerator` for the
+  pattern. The context carries the types already being expanded on this path, so going through it is
+  what keeps your generator from recursing forever on a self-referential type.
+- Check `canMock` before calling `mock`, and honour a `false`. On a blocked context `canMock` returns
+  `false` for everything, which is how recursion stops; a generator that expands nothing (a literal,
+  a bare mock, `null`) can still answer there, and should.
 
 ## 2. Register it in `MockGeneratorRegistry.default()`
 
 ```kotlin
-private fun build(depth: Int): MockGeneratorRegistry {
-    val leafGenerators =
-        listOf(PrimitiveMockGenerator(), StringMockGenerator(), EnumMockGenerator(), InterfaceMockGenerator())
-    if (depth >= MAX_DEPTH) {
-        return MockGeneratorRegistry(leafGenerators + NullableFallbackMockGenerator())
-    }
-    val nested = build(depth + 1)
-    val recursiveGenerators =
-        leafGenerators + DataClassMockGenerator(nested) + CollectionMockGenerator(nested) + FunctionTypeMockGenerator(nested)
-    return MockGeneratorRegistry(recursiveGenerators + NullableFallbackMockGenerator())
-}
+fun default(): MockGeneratorRegistry =
+    MockGeneratorRegistry(
+        listOf(
+            PrimitiveMockGenerator(),
+            StringMockGenerator(),
+            EnumMockGenerator(),
+            SealedTypeMockGenerator(),
+            DataClassMockGenerator(),
+            CollectionMockGenerator(),
+            FunctionTypeMockGenerator(),
+            InterfaceMockGenerator(),
+            NullableFallbackMockGenerator(),
+        ),
+    )
 ```
 
-Two decisions to make here:
+Every generator is available at every point in the recursion — the bound lives in `MockContext`, not
+in this list — so there is only one decision to make here:
 
-- **Leaf or recursive?** If your generator never calls back into a registry to resolve an inner type,
-  it's a leaf generator — add it to `leafGenerators`, so it's available even at `MAX_DEPTH`. If it
-  does recurse, add it to `recursiveGenerators` (constructed with `nested`), so it's excluded once the
-  depth limit is hit rather than risking unbounded recursion.
 - **Where in the list?** `MockGeneratorRegistry.supports`/`generate` resolve by **list order** —
   the first generator whose `supports` matches wins (`any { }`/`first { }` short-circuiting). Put
   narrow, specific-type generators before broad, structural ones. Concretely:

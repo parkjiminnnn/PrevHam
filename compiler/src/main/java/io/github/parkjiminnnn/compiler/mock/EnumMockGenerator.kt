@@ -7,9 +7,15 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 
 internal class EnumMockGenerator : MockGenerator {
-    override fun supports(type: KSType): Boolean = type.firstEnumEntryName() != null
+    override fun supports(
+        type: KSType,
+        context: MockContext,
+    ): Boolean = type.firstEnumEntryName() != null
 
-    override fun generate(type: KSType): CodeBlock {
+    override fun generate(
+        type: KSType,
+        context: MockContext,
+    ): CodeBlock {
         val declaration = type.declaration as KSClassDeclaration
         val className = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
         return CodeBlock.of("%T.%L", className, type.firstEnumEntryName())

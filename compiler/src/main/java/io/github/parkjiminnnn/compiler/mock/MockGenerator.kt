@@ -4,7 +4,15 @@ import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.CodeBlock
 
 internal interface MockGenerator {
-    fun supports(type: KSType): Boolean
+    /** Whether this generator can mock [type]. Must not have side effects. */
+    fun supports(
+        type: KSType,
+        context: MockContext,
+    ): Boolean
 
-    fun generate(type: KSType): CodeBlock
+    /** The mock for [type]. Only called after [supports] returned true for the same arguments. */
+    fun generate(
+        type: KSType,
+        context: MockContext,
+    ): CodeBlock
 }
