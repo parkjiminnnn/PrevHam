@@ -131,6 +131,10 @@ fun UserCard(
 }
 ```
 
+> The composable has to be a top-level function that isn't `private` — the Preview is generated into
+> a separate file, which can only call declarations it can actually reach. `internal` is fine. See
+> the [FAQ](docs/faq.md) if PrevHam rejects one.
+
 ### 4. Build
 
 PrevHam generates the `@Preview` function during the KSP step of your normal Gradle build — no extra task to run.

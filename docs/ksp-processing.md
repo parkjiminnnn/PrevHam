@@ -46,6 +46,7 @@ arguments) is resolvable in a single pass.
 ```kotlin
 private fun processFunction(function: KSFunctionDeclaration) {
     if (!function.isComposable()) { /* log error, skip */ return }
+    if (function.uncallableFromGeneratedFileReason() != null) { /* log error, skip */ return }
 
     val arguments = buildMockArguments(function) ?: return
     val options = function.previewOptions()
@@ -61,11 +62,20 @@ private fun processFunction(function: KSFunctionDeclaration) {
 }
 ```
 
-Three independent pieces of information are gathered before anything is generated:
+Two checks run before anything is generated, then three pieces of information are gathered:
 
 1. **`isComposable()`** — checks `function.annotations` for `androidx.compose.runtime.Composable`,
    again by qualified name string. `@Prev` on a non-`@Composable` function is a hard error, not a
    silent skip, since it's very likely a mistake.
+1. **`uncallableFromGeneratedFileReason()`** — checks that a *separate* file could call the
+   function at all: `functionKind` must be `TOP_LEVEL`, and `getVisibility()` must not be
+   `PRIVATE`. The Preview always goes into a new file, so a member function (no receiver, and for a
+   class member no instance) or a file-private one can never be called from it.
+
+   This is also a hard error. Unlike an unsupported parameter type, which is a gap PrevHam might
+   close later, this one is structural — `CodeGenerator` has no API to add to an existing file, so
+   no future version can make it work. Without the check the file is written anyway and then fails
+   to compile, with an error that never mentions PrevHam.
 2. **`arguments: Map<String, CodeBlock>`** — one mock value per parameter of the annotated function,
    built by the mock generator pipeline (see [mock-generation.md](mock-generation.md)).
 3. **`options: PreviewOptions`** — read from `@Prev`'s own arguments, covered below.

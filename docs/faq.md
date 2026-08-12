@@ -110,6 +110,38 @@ always the last generator checked, so a nullable field always has *some* generat
 worst case, it falls back to a literal `null`. This applies recursively inside data classes,
 collection elements, and function return types too, not just top-level function parameters.
 
+## Why does PrevHam refuse a `private` composable, or one inside a class?
+
+```
+[PrevHam] cannot generate a Preview for 'Greeting': it is private, and a private top-level
+function is visible only inside its own file. Widen it to internal or public to have a Preview
+generated. Alternatively, drop @Prev and write a @Preview function by hand in the same file.
+```
+
+The Preview always goes into a **new** file. KSP's `CodeGenerator` can only create files, never add
+to one that already exists, so whatever the generated file can't call, PrevHam can't preview:
+
+| Declaration | Preview |
+|---|---|
+| top-level `public` / `internal` | generated |
+| top-level `private` | rejected — a private top-level function is scoped to its own file |
+| inside an `object` | rejected — the call would need the declaring type |
+| inside a `class` | rejected — the call would also need an instance |
+| `protected` | rejected — both of the above |
+
+`internal` is the narrowest visibility that works, since it's module-scoped and the generated file
+lands in the same module.
+
+This is an error rather than a skipped Preview because no future version of PrevHam can make it
+work — it's a structural limit of KSP, not a gap to close. It also isn't a *new* build failure:
+without the check, the file is generated and then fails to compile, with an error that says nothing
+about PrevHam. Only the offending composable is rejected; the rest of the file still gets its
+Previews.
+
+Keeping the composable `private` is a perfectly good reason to not use `@Prev` on it. Removing the
+annotation and writing a `@Preview` by hand in the same file is a supported outcome, not a
+workaround.
+
 ## How do I fix a skipped `@Prev`?
 
 In rough order of preference:
