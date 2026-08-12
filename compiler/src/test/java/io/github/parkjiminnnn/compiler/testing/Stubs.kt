@@ -18,7 +18,25 @@ internal object Stubs {
                 val darkMode: Boolean = false,
                 val locales: Array<String> = [],
                 val fontScales: FloatArray = [],
+                val devices: Array<String> = [],
+                val name: String = "",
+                val group: String = "",
+                val apiLevel: Int = -1,
+                val widthDp: Int = -1,
+                val heightDp: Int = -1,
+                val showSystemUi: Boolean = false,
+                val showBackground: Boolean = false,
+                val backgroundColor: Long = 0,
+                val wallpaper: Int = Wallpapers.NONE,
             )
+
+            object Wallpapers {
+                const val NONE: Int = -1
+                const val RED_DOMINATED_EXAMPLE: Int = 0
+                const val GREEN_DOMINATED_EXAMPLE: Int = 1
+                const val BLUE_DOMINATED_EXAMPLE: Int = 2
+                const val YELLOW_DOMINATED_EXAMPLE: Int = 3
+            }
             """,
         )
 
@@ -41,9 +59,18 @@ internal object Stubs {
             @Repeatable
             annotation class Preview(
                 val name: String = "",
-                val uiMode: Int = 0,
+                val group: String = "",
+                val apiLevel: Int = -1,
+                val widthDp: Int = -1,
+                val heightDp: Int = -1,
                 val locale: String = "",
                 val fontScale: Float = 1f,
+                val showSystemUi: Boolean = false,
+                val showBackground: Boolean = false,
+                val backgroundColor: Long = 0,
+                val uiMode: Int = 0,
+                val device: String = "",
+                val wallpaper: Int = -1,
             )
             """,
         )
@@ -77,8 +104,25 @@ internal object Stubs {
             """,
         )
 
+    // Wallpapers.* constants the generated annotation can reference by name.
+    val wallpapers =
+        SourceFile.kotlin(
+            "Wallpaper.kt",
+            """
+            package androidx.compose.ui.tooling.preview
+
+            object Wallpapers {
+                const val NONE: Int = -1
+                const val RED_DOMINATED_EXAMPLE: Int = 0
+                const val GREEN_DOMINATED_EXAMPLE: Int = 1
+                const val BLUE_DOMINATED_EXAMPLE: Int = 2
+                const val YELLOW_DOMINATED_EXAMPLE: Int = 3
+            }
+            """,
+        )
+
     // kotlinx.coroutines and MockK need no stubs: both are real dependencies of this module's
     // tests, so inheritClassPath makes them resolvable in compiled sources and in the code KSP
     // generates from them.
-    val all = listOf(prev, composable, preview, configuration, modifier)
+    val all = listOf(prev, composable, preview, configuration, modifier, wallpapers)
 }

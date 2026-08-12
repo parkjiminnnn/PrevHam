@@ -15,7 +15,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 [Why PrevHam?](#-why-prevham) •
 [Quick Start](#-quick-start) •
 [How It Works](#-how-it-works) •
-[Docs](docs/architecture.md)
+[Docs](docs/prev-annotation.md)
 
 </div>
 
@@ -38,7 +38,8 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Mock member stubbing | Stubs a mock's properties and functions up front — including `StateFlow`/`Flow` members — so Preview rendering never depends on MockK's recursive relaxed mocking |
 | Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
 | Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
-| Preview options | Dark mode, locale, font scale variants via `@Prev(darkMode, locales, fontScales)` |
+| Preview variants | Dark mode, locale, font scale, and device variants from one `@Prev` |
+| Preview settings | `name`, `group`, `apiLevel`, `widthDp`/`heightDp`, `showSystemUi`, `showBackground`, `backgroundColor`, `wallpaper` applied to every generated `@Preview` |
 
 > See [Releases](https://github.com/parkjiminnnn/PrevHam/releases) for what shipped in each version, and [open issues](https://github.com/parkjiminnnn/PrevHam/issues) for what's planned next.
 
@@ -150,9 +151,11 @@ private fun UserCardPreview() {
 }
 ```
 
-### 5. (Optional) Request Preview variants
+### 5. (Optional) Configure the Preview
 
-`@Prev` accepts `darkMode`, `locales`, and `fontScales` to generate additional stacked `@Preview` annotations, alongside the default one.
+`@Prev`'s parameters come in two kinds.
+
+**Variants** — `darkMode`, `locales`, `fontScales`, `devices` — each add stacked `@Preview` annotations alongside the default one.
 
 ```kotlin
 @Prev(darkMode = true, locales = ["ko", "en"], fontScales = [0.85f, 1.5f])
@@ -178,6 +181,36 @@ private fun UserCardPreview() {
 }
 ```
 
+**Settings** — `name`, `group`, `apiLevel`, `widthDp`, `heightDp`, `showSystemUi`, `showBackground`, `backgroundColor`, `wallpaper` — describe *how* to render rather than *what* to render, so they apply to every generated `@Preview`, variants included. Each mirrors the `@Preview` parameter of the same name, and anything left at its default is left out of the generated code. PrevHam ships `Devices` and `Wallpapers` objects carrying the same constants as Compose's, so `@Prev` reads the same as the `@Preview` it generates:
+
+```kotlin
+@Prev(devices = [Devices.PIXEL_5, Devices.PIXEL_TABLET], wallpaper = Wallpapers.BLUE_DOMINATED_EXAMPLE)
+```
+
+```kotlin
+@Prev(name = "Badge", darkMode = true, group = "cards", showBackground = true)
+@Composable
+fun UserCard(user: User, onClick: () -> Unit) {
+    // ...
+}
+```
+
+```kotlin
+@Preview(name = "Badge", group = "cards", showBackground = true)
+@Preview(
+    name = "Badge - Dark Mode",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    group = "cards",
+    showBackground = true,
+)
+@Composable
+private fun UserCardPreview() { /* ... */ }
+```
+
+A configured `name` becomes the variants' common prefix, so each stays distinguishable in the IDE rather than several Previews sharing one name.
+
+> Every parameter, with what it generates, is listed in [`docs/prev-annotation.md`](docs/prev-annotation.md).
+
 ---
 
 ## ⚙️ How It Works
@@ -194,7 +227,7 @@ flowchart LR
 ```
 
 1. **Resolve** — `PrevSymbolProcessor` asks the KSP `Resolver` for every symbol annotated with `@Prev`.
-2. **Analyze** — each annotated function's parameter list is inspected: type, nullability, and shape (primitive, data class, collection, enum, interface). The `@Prev` annotation's own arguments (`darkMode`, `locales`, `fontScales`) are also read to determine which Preview variants to generate.
+2. **Analyze** — each annotated function's parameter list is inspected: type, nullability, and shape (primitive, data class, collection, enum, interface). The `@Prev` annotation's own arguments are also read: the variant axes (`darkMode`, `locales`, `fontScales`, `devices`) decide how many `@Preview` annotations to emit, and the remaining settings are applied to all of them.
 3. **Generate mocks** — a dedicated mock generator produces a compile-time-safe value for each supported parameter type.
 4. **Emit source** — [KotlinPoet](https://square.github.io/kotlinpoet/) assembles a new `@Preview @Composable` function that calls the original composable with the generated mocks, stacking one `@Preview` per requested variant (Compose's `@Preview` is `@Repeatable`).
 5. **Compile** — the generated file is fed back into the same compilation unit, so the Preview is available immediately, with full IDE support.

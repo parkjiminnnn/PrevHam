@@ -83,8 +83,8 @@ Two checks run before anything is generated, then three pieces of information ar
 ### Reading `@Prev`'s own arguments
 
 Every other part of `compiler` reads the *types of the annotated function's parameters*. Reading
-`darkMode`/`locales`/`fontScales` off `@Prev` itself is a different KSP API: it means reading the
-*arguments of the annotation instance*, via `KSAnnotation.arguments`:
+`@Prev`'s own arguments is a different KSP API: it means reading the *arguments of the annotation
+instance*, via `KSAnnotation.arguments`:
 
 ```kotlin
 internal fun KSFunctionDeclaration.previewOptions(): PreviewOptions {
@@ -93,9 +93,10 @@ internal fun KSFunctionDeclaration.previewOptions(): PreviewOptions {
     }
     val argumentsByName = prevAnnotation.arguments.associateBy { it.name?.asString() }
     return PreviewOptions(
-        darkMode = argumentsByName["darkMode"]?.value as? Boolean ?: false,
+        darkMode = boolean("darkMode", default = false),
         locales = argumentsByName["locales"]?.value.asList(),
-        fontScales = argumentsByName["fontScales"]?.value.asList(),
+        // ...
+        settings = PreviewSettings(/* name, group, apiLevel, widthDp, ... */),
     )
 }
 ```
@@ -104,13 +105,34 @@ internal fun KSFunctionDeclaration.previewOptions(): PreviewOptions {
   it's filtered down to the one matching `@Prev`'s qualified name.
 - `KSAnnotation.arguments` is `List<KSValueArgument>`. Each entry's `.value` is already resolved to a
   plain Kotlin runtime value by KSP — `Boolean` for `darkMode`, `List<*>` for the array-typed
-  `locales`/`fontScales` (confirmed empirically; KSP normalizes both `Array<String>` and `FloatArray`
-  annotation members to `List<*>` here, not to `Array`/`FloatArray`).
+  `locales`/`fontScales`/`devices` (confirmed empirically; KSP normalizes both `Array<String>` and
+  `FloatArray` annotation members to `List<*>` here, not to `Array`/`FloatArray`).
 - Default values declared on `@Prev` itself (`darkMode: Boolean = false`, etc.) are filled in by KSP
-  even when the call site omits them, so `arguments` always has all three entries.
+  even when the call site omits them, so `arguments` always has every entry. An omitted argument and
+  an explicitly-default one are therefore indistinguishable — which is fine, since both mean "leave
+  it out of the generated annotation".
 
-`PreviewOptions` is then threaded into `PreviewFileGenerator.generate(...)`, which stacks one
-`@Preview` per requested variant on the generated function.
+### Variants and settings
+
+`PreviewOptions` splits `@Prev`'s parameters the way the generated annotations are built:
+
+- **Variants** (`darkMode`, `locales`, `fontScales`, `devices`) decide *how many* `@Preview`
+  annotations there are. Each value adds one, alongside the default.
+- **Settings** (`name`, `group`, `apiLevel`, `widthDp`, `heightDp`, `showSystemUi`,
+  `showBackground`, `backgroundColor`, `wallpaper`) describe *how* to render rather than what, so
+  `PreviewFileGenerator` applies them to every generated annotation, variants included.
+
+Each setting's default mirrors the corresponding `@Preview` parameter's default, which is what lets
+the generator write out only what actually differs — a bare `@Prev` still produces a bare
+`@Preview`. Two values are reformatted on the way out rather than echoed as received:
+`backgroundColor` back to `0xAARRGGBB` hex, and `wallpaper` from the `Int` it arrives as to the
+named `Wallpapers.*` constant, since a bare `2` says nothing to a reader. PrevHam declares its own
+`Wallpapers` in `runtime` with the same names and values as Compose's, so `@Prev` reads the same as
+the `@Preview` it generates without `runtime` taking on a dependency.
+
+`name` is the one setting that isn't a plain pass-through: it becomes the variants' common prefix
+(`"Card - Dark Mode"`), since replacing their labels outright would leave several Previews sharing a
+single name.
 
 ## Generic type resolution: `resolve()` vs. `asMemberOf()`
 
