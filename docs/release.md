@@ -1,9 +1,14 @@
 # Releasing
 
-PrevHam publishes two artifacts to Maven Central:
+PrevHam publishes three artifacts to Maven Central:
 
 - `io.github.parkjiminnnn:prevham-runtime` — the `@Prev` annotation
 - `io.github.parkjiminnnn:prevham-compiler` — the KSP processor
+- `io.github.parkjiminnnn:prevham-gradle-plugin` — the convenience plugin, published together with
+  the plugin marker `plugins { id("io.github.parkjiminnnn.prevham") }` resolves. Publishing it to
+  Maven Central rather than the Gradle Plugin Portal is what keeps releases on a single pipeline;
+  Gradle finds the marker through any repository listed in `pluginManagement`, and Android Studio's
+  default `settings.gradle.kts` already lists `mavenCentral()` there.
 
 Releases are automated by [`.github/workflows/release.yml`](../.github/workflows/release.yml). This
 document covers how to cut one and how the automation decides what to do.
