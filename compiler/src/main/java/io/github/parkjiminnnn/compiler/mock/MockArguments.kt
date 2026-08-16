@@ -18,19 +18,22 @@ internal fun KSValueParameter.toMockParameter(type: KSType = this.type.resolve()
     return MockParameter(name, type, hasDefault)
 }
 
+// Shared by the processor, for a @Prev function's own parameters, and by DataClassMockGenerator,
+// for a constructor's. Both descend through the context, so a parameter list nested inside another
+// type is bounded by the same path the rest of the recursion is.
 internal fun firstUnsupportedParameter(
     parameters: List<MockParameter>,
-    registry: MockGeneratorRegistry,
-): MockParameter? = parameters.firstOrNull { parameter -> !registry.supports(parameter.type) && !parameter.hasDefault }
+    context: MockContext,
+): MockParameter? = parameters.firstOrNull { parameter -> !context.canMock(parameter.type) && !parameter.hasDefault }
 
 internal fun buildMockArguments(
     parameters: List<MockParameter>,
-    registry: MockGeneratorRegistry,
+    context: MockContext,
 ): Map<String, CodeBlock> {
     val arguments = LinkedHashMap<String, CodeBlock>()
     for (parameter in parameters) {
-        if (registry.supports(parameter.type)) {
-            arguments[parameter.name] = registry.generate(parameter.type)
+        if (context.canMock(parameter.type)) {
+            arguments[parameter.name] = context.mock(parameter.type)
         }
     }
     return arguments

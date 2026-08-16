@@ -19,16 +19,20 @@ Two constraints shape every design decision in this project:
 flowchart LR
     runtime["runtime<br/>@Prev annotation"] -->|implementation| sample
     compiler["compiler<br/>KSP SymbolProcessor"] -->|ksp| sample["sample<br/>demo app"]
+    gradle-plugin["gradle-plugin<br/>declares the dependencies"] -.->|adds| runtime
+    gradle-plugin -.->|adds| compiler
     build-logic["build-logic<br/>convention plugins"] -.->|applies to| runtime
     build-logic -.->|applies to| compiler
     build-logic -.->|applies to| sample
+    build-logic -.->|applies to| gradle-plugin
 ```
 
 | Module | Responsibility | Constraints |
 |---|---|---|
 | [`runtime`](../runtime) | Defines the `@Prev` annotation. The only public API library users depend on. Published as `io.github.parkjiminnnn:prevham-runtime`. | No codegen logic. Minimal dependencies. Must stay lightweight and stable, since it's the one artifact consumers compile against directly. Deliberately a plain Kotlin/JVM library, not an Android library — see [Why `runtime` isn't an Android library](#why-runtime-isnt-an-android-library). |
-| [`compiler`](../compiler) | Implements the KSP `SymbolProcessor` that finds `@Prev`-annotated functions, generates mock values, and emits Preview source via KotlinPoet. Published as `io.github.parkjiminnnn:prevham-compiler`. | All codegen is compile-time only. No runtime reflection. Output must be deterministic. Mock generation is split into small, independently testable components (see [mock-generation.md](mock-generation.md)). |
+| [`compiler`](../compiler) | Implements the KSP `SymbolProcessor` that finds [`@Prev`](prev-annotation.md)-annotated functions, generates mock values, and emits Preview source via KotlinPoet. Published as `io.github.parkjiminnnn:prevham-compiler`. | All codegen is compile-time only. No runtime reflection. Output must be deterministic. Mock generation is split into small, independently testable components (see [mock-generation.md](mock-generation.md)). |
 | [`sample`](../sample) | A real Android app that exercises every supported feature. Demo composables live in [`showcase/`](../sample/src/main/java/io/github/parkjiminnnn/prevham/showcase), one file per mock-generation category, and `MainActivity` renders them all with hand-written arguments — so the app screen and the IDE's Preview pane show the same composables side by side, one with real data and one with generated mocks. Doubles as a verification project: if a `@Prev`-annotated composable in `sample` doesn't produce a compiling Preview, something in `compiler` is broken. | — |
+| [`gradle-plugin`](../gradle-plugin) | A Gradle plugin (`io.github.parkjiminnnn.prevham`) that declares `runtime`, `compiler` and MockK for consumers, at its own version. Published as `io.github.parkjiminnnn:prevham-gradle-plugin`, together with the plugin marker `plugins { id(...) }` resolves. | Deliberately does **not** apply KSP: a KSP version is tied to a Kotlin version, so applying it would pin the consumer's Kotlin to PrevHam's. The KSP Gradle plugin is `compileOnly` so it never reaches a consumer's buildscript classpath, and the plugin fails with an actionable message when KSP is absent. Covered by Gradle TestKit, which runs real builds rather than asserting on Gradle objects. |
 | [`build-logic`](../build-logic) | Gradle convention plugins (`prevham.kotlin.jvm`, `prevham.android.application`, `prevham.ksp`, `prevham.ktlint`, `prevham.publishing`) shared across modules. | Centralizes Kotlin/AGP/KSP versions, lint, and Maven Central publishing configuration in one place. |
 
 ## Dependency direction

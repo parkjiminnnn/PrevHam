@@ -1,14 +1,12 @@
 <div align="center">
 
-<!-- Project banner/logo — drop an image at docs/images/banner.png (or .svg) and uncomment: -->
-<!-- <img src="docs/images/banner.png" alt="PrevHam banner" width="600"/> -->
-
 # PrevHam
 
 **Compile-time Jetpack Compose Preview & mock data generation, powered by KSP.**
 
 Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Preview` function and its mock arguments for you — no runtime reflection, no boilerplate.
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.parkjiminnnn/prevham-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/io.github.parkjiminnnn)
 [![CI](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml/badge.svg)](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.2.10-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
@@ -17,8 +15,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 [Why PrevHam?](#-why-prevham) •
 [Quick Start](#-quick-start) •
 [How It Works](#-how-it-works) •
-[Roadmap](#-roadmap) •
-[Docs](docs/architecture.md)
+[Docs](docs/prev-annotation.md)
 
 </div>
 
@@ -26,22 +23,26 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 
 ## ✨ Features
 
-| Feature | Description | Status |
-|---|---|---|
-| `@Prev` annotation | Single annotation to trigger Preview generation | ✅ Done |
-| Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet | ✅ Done |
-| Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. | ✅ Done |
-| Data class mocks | Builds mock instances for flat data class parameters | ✅ Done |
-| Nullable support | Uses a real mock when possible, falls back to `null` otherwise | ✅ Done |
-| Collection support | Generates mock `List`, `Set`, `Map` values | ✅ Done |
-| Enum support | Picks a valid mock value from enum constants | ✅ Done |
-| Nested data classes | Recursive mock generation for nested data classes and collections (depth-limited) | ✅ Done |
-| Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) | ✅ Done |
-| Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types | ✅ Done |
-| Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) | ✅ Done |
-| Preview options | Dark mode, locale, font scale variants via `@Prev(darkMode, locales, fontScales)` | ✅ Done |
+| Feature | Description |
+|---|---|
+| `@Prev` annotation | Single annotation to trigger Preview generation |
+| Gradle plugin | One plugin line declares runtime, compiler and MockK at a single version |
+| Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet |
+| Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. |
+| Data class mocks | Builds mock instances for flat data class parameters |
+| Nullable support | Uses a real mock when possible, falls back to `null` otherwise |
+| Collection support | Generates mock `List`, `Set`, `Map` values |
+| Enum support | Picks a valid mock value from enum constants |
+| Nested data classes | Recursive mock generation for nested data classes and collections, as deep as the model goes — bounded by cycle detection, not a depth limit |
+| Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
+| Sealed type support | Builds a real subtype (e.g. `UiState.Loading`) instead of mocking the sealed type |
+| Mock member stubbing | Stubs a mock's properties and functions up front — including `StateFlow`/`Flow` members — so Preview rendering never depends on MockK's recursive relaxed mocking |
+| Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
+| Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
+| Preview variants | Dark mode, locale, font scale, and device variants from one `@Prev` |
+| Preview settings | `name`, `group`, `apiLevel`, `widthDp`/`heightDp`, `showSystemUi`, `showBackground`, `backgroundColor`, `wallpaper` applied to every generated `@Preview` |
 
-> **Legend** — ✅ In progress · 🚧 Planned · See the full [Roadmap](#-roadmap) for release-by-release detail.
+> See [Releases](https://github.com/parkjiminnnn/PrevHam/releases) for what shipped in each version, and [open issues](https://github.com/parkjiminnnn/PrevHam/issues) for what's planned next.
 
 ---
 
@@ -93,21 +94,33 @@ fun UserCard(
 
 > Published versions are listed on [Maven Central](https://central.sonatype.com/namespace/io.github.parkjiminnnn).
 
-### 1. Apply the KSP plugin
+### 1. Apply the plugins
 
 ```kotlin
 // build.gradle.kts
 plugins {
     id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+    id("io.github.parkjiminnnn.prevham") version "1.1.0"
 }
 ```
 
-### 2. Add the dependencies
+That's the whole setup — the PrevHam plugin declares `prevham-runtime`, `prevham-compiler` and MockK for you, all at its own version, so they can't drift apart.
+
+The KSP version is yours to pick, and deliberately so: a KSP version is tied to a Kotlin version, and pinning it here would pin your Kotlin version to PrevHam's. Use the one matching your Kotlin.
+
+<details>
+<summary>Declaring the dependencies by hand instead</summary>
+
+Necessary for Kotlin Multiplatform, whose source sets use different configuration names than the plugin handles.
 
 ```kotlin
+plugins {
+    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+}
+
 dependencies {
-    implementation("io.github.parkjiminnnn:prevham-runtime:1.0.0")
-    ksp("io.github.parkjiminnnn:prevham-compiler:1.0.0")
+    implementation("io.github.parkjiminnnn:prevham-runtime:1.1.0")
+    ksp("io.github.parkjiminnnn:prevham-compiler:1.1.0")
 
     // Required if any @Prev composable has an interface or non-data-class parameter
     // (e.g. Modifier) — PrevHam mocks those with MockK's mockk<T>(relaxed = true).
@@ -117,7 +130,9 @@ dependencies {
 }
 ```
 
-### 3. Annotate your composable
+</details>
+
+### 2. Annotate your composable
 
 ```kotlin
 import io.github.parkjiminnnn.runtime.Prev
@@ -132,7 +147,11 @@ fun UserCard(
 }
 ```
 
-### 4. Build
+> The composable has to be a top-level function that isn't `private` — the Preview is generated into
+> a separate file, which can only call declarations it can actually reach. `internal` is fine. See
+> the [FAQ](docs/faq.md) if PrevHam rejects one.
+
+### 3. Build
 
 PrevHam generates the `@Preview` function during the KSP step of your normal Gradle build — no extra task to run.
 
@@ -147,9 +166,11 @@ private fun UserCardPreview() {
 }
 ```
 
-### 5. (Optional) Request Preview variants
+### 4. (Optional) Configure the Preview
 
-`@Prev` accepts `darkMode`, `locales`, and `fontScales` to generate additional stacked `@Preview` annotations, alongside the default one.
+`@Prev`'s parameters come in two kinds.
+
+**Variants** — `darkMode`, `locales`, `fontScales`, `devices` — each add stacked `@Preview` annotations alongside the default one.
 
 ```kotlin
 @Prev(darkMode = true, locales = ["ko", "en"], fontScales = [0.85f, 1.5f])
@@ -175,6 +196,36 @@ private fun UserCardPreview() {
 }
 ```
 
+**Settings** — `name`, `group`, `apiLevel`, `widthDp`, `heightDp`, `showSystemUi`, `showBackground`, `backgroundColor`, `wallpaper` — describe *how* to render rather than *what* to render, so they apply to every generated `@Preview`, variants included. Each mirrors the `@Preview` parameter of the same name, and anything left at its default is left out of the generated code. PrevHam ships `Devices` and `Wallpapers` objects carrying the same constants as Compose's, so `@Prev` reads the same as the `@Preview` it generates:
+
+```kotlin
+@Prev(devices = [Devices.PIXEL_5, Devices.PIXEL_TABLET], wallpaper = Wallpapers.BLUE_DOMINATED_EXAMPLE)
+```
+
+```kotlin
+@Prev(name = "Badge", darkMode = true, group = "cards", showBackground = true)
+@Composable
+fun UserCard(user: User, onClick: () -> Unit) {
+    // ...
+}
+```
+
+```kotlin
+@Preview(name = "Badge", group = "cards", showBackground = true)
+@Preview(
+    name = "Badge - Dark Mode",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    group = "cards",
+    showBackground = true,
+)
+@Composable
+private fun UserCardPreview() { /* ... */ }
+```
+
+A configured `name` becomes the variants' common prefix, so each stays distinguishable in the IDE rather than several Previews sharing one name.
+
+> Every parameter, with what it generates, is listed in [`docs/prev-annotation.md`](docs/prev-annotation.md).
+
 ---
 
 ## ⚙️ How It Works
@@ -191,49 +242,12 @@ flowchart LR
 ```
 
 1. **Resolve** — `PrevSymbolProcessor` asks the KSP `Resolver` for every symbol annotated with `@Prev`.
-2. **Analyze** — each annotated function's parameter list is inspected: type, nullability, and shape (primitive, data class, collection, enum, interface). The `@Prev` annotation's own arguments (`darkMode`, `locales`, `fontScales`) are also read to determine which Preview variants to generate.
+2. **Analyze** — each annotated function's parameter list is inspected: type, nullability, and shape (primitive, data class, collection, enum, interface). The `@Prev` annotation's own arguments are also read: the variant axes (`darkMode`, `locales`, `fontScales`, `devices`) decide how many `@Preview` annotations to emit, and the remaining settings are applied to all of them.
 3. **Generate mocks** — a dedicated mock generator produces a compile-time-safe value for each supported parameter type.
 4. **Emit source** — [KotlinPoet](https://square.github.io/kotlinpoet/) assembles a new `@Preview @Composable` function that calls the original composable with the generated mocks, stacking one `@Preview` per requested variant (Compose's `@Preview` is `@Repeatable`).
 5. **Compile** — the generated file is fed back into the same compilation unit, so the Preview is available immediately, with full IDE support.
 
 ---
-
-## 🗺 Roadmap
-
-### v0.1 — Foundation
-- [x] `@Prev` annotation
-- [x] Basic KSP `SymbolProcessor` structure
-- [x] Automatic Preview generation
-- [x] Primitive type support
-- [x] String support
-- [x] Data class mock generation
-
-### v0.2 — Type coverage
-- [x] Nullable type support
-- [x] Enum support
-- [x] Collection support
-- [x] Nested data class support
-
-### v0.3 — Advanced types
-- [x] Function type support
-- [x] Interface mock generation (MockK)
-- [x] Generic type support
-
-### v0.4 — Preview options
-- [x] Preview option support
-- [x] Dark mode Preview
-- [x] Locale Preview
-- [x] Font scale Preview
-
-### v1.0 — Stable release
-- [x] Stable public API
-- [x] Maven Central publishing setup
-- [x] Automated release pipeline
-- [ ] Improved documentation
-- [ ] Sample project polish
-
----
-
 
 ## 📄 License
 

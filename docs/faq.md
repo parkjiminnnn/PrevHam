@@ -19,12 +19,12 @@ allowed to be unsupported — the generated call simply omits them and lets the 
 
 ## What types aren't supported today?
 
-- **Types nested more than 3 levels deep.** `MockGeneratorRegistry.default()` bounds recursion at
-  `MAX_DEPTH = 3` specifically to avoid a `StackOverflowError` on self-referential or very deeply
-  nested types (`data class Node(val next: Node?)`, `List<List<List<List<Int>>>>`, ...). A type that's
-  still "container-shaped" (a data class, collection, or function type) at that depth is treated as
-  unsupported. See [`mock-generation.md`](mock-generation.md#depth-limited-recursion) for why this is
-  a structural limit rather than a special case.
+- **A type that has to contain an instance of itself**, like `data class Node(val next: Node)`. No
+  value of that type can be constructed in ordinary code either. Recursion stops wherever a type is
+  about to be expanded a second time on the same path, and where the stop lands on something that
+  needs no expansion the mock is still built — `data class Node(val value: Int, val next: Node?)`
+  becomes `Node(value = 1, next = null)`. There is **no depth limit**: nesting can go as deep as the
+  model does. See [`mock-generation.md`](mock-generation.md#bounding-recursion-cycle-detection-not-depth).
 - **Generic types with unresolvable type arguments**, e.g. a star projection like `Repository<*>`.
   `InterfaceMockGenerator` can't determine a concrete type to write inside `mockk<...>()` for these,
   so it reports the type as unsupported rather than emitting code that wouldn't compile.
@@ -35,12 +35,73 @@ allowed to be unsupported — the generated call simply omits them and lets the 
 
 ## Does mocking a `sealed interface`/`sealed class` break an exhaustive `when`?
 
-No. It's a reasonable worry — a naive proxy-based mock could produce a value whose runtime type isn't
-any of the sealed hierarchy's declared subtypes, which would make an otherwise-exhaustive `when` throw
-at runtime. This was verified empirically against MockK's actual behavior: `mockk<T>(relaxed = true)`
-on a sealed type falls back to instantiating a **real concrete subtype** (via objenesis, with default
-field values), not a synthetic unknown type. Exhaustive `when` matching over the mocked value works
-normally.
+Sealed types aren't mocked at all any more. `SealedTypeMockGenerator` builds a real instance of one of
+the declared subtypes — `UiState.Loading`, or `PaymentResult.Approved(receiptId = 1L)` — so a `when`
+over it behaves exactly as it would with a hand-written Preview.
+
+This used to go through MockK, and an exhaustive `when` did work: MockK instantiates a sealed type via
+Objenesis, which produces a real concrete subtype rather than a synthetic one. The reasons for moving
+off it are different — Objenesis skips the constructor, so the instance's fields are unset; the
+subtype it picks is MockK's choice rather than something recorded in the generated file; and every
+member read off it is answered by relaxed mode, with the consequences described two questions down.
+
+## Which subtype does PrevHam pick for a sealed type?
+
+`object` subtypes first, then by simple name, taking the first one it can actually build. So a
+`Loading`/`Success`/`Error` UI state resolves to `Loading`. The order is fixed rather than left to
+`getSealedSubclasses()`, which promises no particular ordering, so the generated file doesn't change
+between builds.
+
+If no subtype can be built — the sealed type is generic, or every subtype's fields exceed the depth
+limit — PrevHam falls back to `mockk<T>(relaxed = true)` for that type, with the caveat in the next
+question.
+
+## Why did my Preview crash with a `ClassCastException` on a ViewModel-shaped parameter?
+
+```
+java.lang.ClassCastException: class java.lang.Object cannot be cast to class FestivalUiState
+```
+
+This was issue #59, fixed in the release after 1.0.0. The cause is **type erasure**, not anything
+Android- or Preview-specific.
+
+`StateFlow<T>.value` erases to `Object` in the bytecode. MockK's relaxed mode answers an unstubbed
+call by inventing a value for the return type it can see — which for a generic member is just
+`Object`. So `viewModel.uiState.value` handed back a bare `java.lang.Object`, and the checkcast the
+Kotlin compiler inserts at the call site rejected it.
+
+PrevHam now stubs the members it can build values for up front:
+
+```kotlin
+mockk<HomeViewModel>(relaxed = true) {
+    every { uiState } returns MutableStateFlow(FestivalUiState.Loading)
+}
+```
+
+A stubbed member never reaches the relaxed fallback, so nothing has to be recovered from an erased
+type. `GeneratedMockValueTest` in `sample` covers both directions — the stub yields the real state
+object, and a relaxed-only mock still throws.
+
+Worth noting, since the original report pointed this way: the classloader names in that message
+(`... is in unnamed module of loader StudioModuleClassLoader ...`) are just how the JVM formats every
+`ClassCastException`. They aren't a sign of a classloader problem — the same crash reproduces in an
+ordinary JVM unit test.
+
+Some members are still left to relaxed mode, and a composable reading a generic member off *those* can
+still hit this crash:
+
+- **`vararg` functions, generic functions, non-public members, and types no generator supports** (see
+  the list above).
+- **A member whose type is already being expanded further up the chain.** Recursion has to stop
+  somewhere, and that mock comes out bare.
+
+A long chain of interfaces is no longer one of these. `Outer.middle` → `Middle.inner` →
+`Inner.items: StateFlow<Item>` used to leave the innermost mock bare once the old depth limit ran
+out, which put this crash back within reach; nothing there revisits a type, so it is now stubbed all
+the way down (issue #60).
+
+Extracting a stateless composable that takes the resolved state directly, and putting `@Prev` on that,
+avoids all of it — and is the better Compose shape regardless.
 
 ## My data class has a nullable field of an otherwise-unsupported type — does the whole function get skipped?
 
@@ -48,6 +109,38 @@ No. `NullableFallbackMockGenerator` matches *any* nullable type (`isMarkedNullab
 always the last generator checked, so a nullable field always has *some* generator that supports it —
 worst case, it falls back to a literal `null`. This applies recursively inside data classes,
 collection elements, and function return types too, not just top-level function parameters.
+
+## Why does PrevHam refuse a `private` composable, or one inside a class?
+
+```
+[PrevHam] cannot generate a Preview for 'Greeting': it is private, and a private top-level
+function is visible only inside its own file. Widen it to internal or public to have a Preview
+generated. Alternatively, drop @Prev and write a @Preview function by hand in the same file.
+```
+
+The Preview always goes into a **new** file. KSP's `CodeGenerator` can only create files, never add
+to one that already exists, so whatever the generated file can't call, PrevHam can't preview:
+
+| Declaration | Preview |
+|---|---|
+| top-level `public` / `internal` | generated |
+| top-level `private` | rejected — a private top-level function is scoped to its own file |
+| inside an `object` | rejected — the call would need the declaring type |
+| inside a `class` | rejected — the call would also need an instance |
+| `protected` | rejected — both of the above |
+
+`internal` is the narrowest visibility that works, since it's module-scoped and the generated file
+lands in the same module.
+
+This is an error rather than a skipped Preview because no future version of PrevHam can make it
+work — it's a structural limit of KSP, not a gap to close. It also isn't a *new* build failure:
+without the check, the file is generated and then fails to compile, with an error that says nothing
+about PrevHam. Only the offending composable is rejected; the rest of the file still gets its
+Previews.
+
+Keeping the composable `private` is a perfectly good reason to not use `@Prev` on it. Removing the
+annotation and writing a `@Preview` by hand in the same file is a supported outcome, not a
+workaround.
 
 ## How do I fix a skipped `@Prev`?
 

@@ -4,9 +4,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import io.github.parkjiminnnn.runtime.Prev
 
-// DataClassMockGenerator builds a named-argument constructor call, recursing through the registry
-// for each constructor parameter. `Order` nests two levels deep (Order -> User/Address -> String),
-// which stays within the registry's depth limit.
+// DataClassMockGenerator builds a named-argument constructor call, recursing through the context
+// for each constructor parameter. `Order` nests two levels deep (Order -> User/Address -> String).
+// Nesting isn't capped at a depth - recursion only stops where a type would expand into itself, so
+// a model like this is built out in full however many levels it has.
 
 data class User(
     val id: Int,

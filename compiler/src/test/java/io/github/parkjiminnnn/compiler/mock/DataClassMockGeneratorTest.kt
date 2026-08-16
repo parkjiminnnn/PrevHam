@@ -123,4 +123,34 @@ class DataClassMockGeneratorTest {
         assertTrue(result.messages.contains("no mock generator available for parameter 'holder'"))
         assertEquals(null, result.generatedFile("ListenerCardPreview.kt"))
     }
+
+    @Test
+    fun `builds a real instance for a nullable data class`() {
+        // asMemberOf() throws on a nullable containing type rather than returning nothing, which
+        // failed the whole KSP round with an IllegalArgumentException instead of skipping one
+        // parameter. Nullable types are meant to reach NullableFallbackMockGenerator only when no
+        // other generator can serve them, so this has to produce a real Item.
+        val result =
+            compilePrev(
+                SourceFile.kotlin(
+                    "OptionalCard.kt",
+                    """
+                    package test
+                    import androidx.compose.runtime.Composable
+                    import io.github.parkjiminnnn.runtime.Prev
+
+                    data class Item(val title: String)
+
+                    @Prev
+                    @Composable
+                    fun OptionalCard(item: Item?) {}
+                    """,
+                ),
+            )
+
+        assertEquals(result.messages, KotlinCompilation.ExitCode.OK, result.exitCode)
+        val generated = requireNotNull(result.generatedFile("OptionalCardPreview.kt"))
+        assertTrue(generated, generated.contains("item = Item("))
+        assertTrue(generated, generated.contains("""title = "mock""""))
+    }
 }

@@ -27,3 +27,4 @@ rootProject.name = "PrevHam"
 include(":sample")
 include(":runtime")
 include(":compiler")
+include(":gradle-plugin")
