@@ -26,6 +26,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Feature | Description |
 |---|---|
 | `@Prev` annotation | Single annotation to trigger Preview generation |
+| Gradle plugin | One plugin line declares runtime, compiler and MockK at a single version |
 | Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet |
 | Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. |
 | Data class mocks | Builds mock instances for flat data class parameters |
@@ -93,18 +94,30 @@ fun UserCard(
 
 > Published versions are listed on [Maven Central](https://central.sonatype.com/namespace/io.github.parkjiminnnn).
 
-### 1. Apply the KSP plugin
+### 1. Apply the plugins
 
 ```kotlin
 // build.gradle.kts
 plugins {
     id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+    id("io.github.parkjiminnnn.prevham") version "1.0.0"
 }
 ```
 
-### 2. Add the dependencies
+That's the whole setup — the PrevHam plugin declares `prevham-runtime`, `prevham-compiler` and MockK for you, all at its own version, so they can't drift apart.
+
+The KSP version is yours to pick, and deliberately so: a KSP version is tied to a Kotlin version, and pinning it here would pin your Kotlin version to PrevHam's. Use the one matching your Kotlin.
+
+<details>
+<summary>Declaring the dependencies by hand instead</summary>
+
+Necessary for Kotlin Multiplatform, whose source sets use different configuration names than the plugin handles.
 
 ```kotlin
+plugins {
+    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+}
+
 dependencies {
     implementation("io.github.parkjiminnnn:prevham-runtime:1.0.0")
     ksp("io.github.parkjiminnnn:prevham-compiler:1.0.0")
@@ -117,7 +130,9 @@ dependencies {
 }
 ```
 
-### 3. Annotate your composable
+</details>
+
+### 2. Annotate your composable
 
 ```kotlin
 import io.github.parkjiminnnn.runtime.Prev
@@ -136,7 +151,7 @@ fun UserCard(
 > a separate file, which can only call declarations it can actually reach. `internal` is fine. See
 > the [FAQ](docs/faq.md) if PrevHam rejects one.
 
-### 4. Build
+### 3. Build
 
 PrevHam generates the `@Preview` function during the KSP step of your normal Gradle build — no extra task to run.
 
@@ -151,7 +166,7 @@ private fun UserCardPreview() {
 }
 ```
 
-### 5. (Optional) Configure the Preview
+### 4. (Optional) Configure the Preview
 
 `@Prev`'s parameters come in two kinds.
 

@@ -24,6 +24,7 @@ PrevHam
 ├── sample/
 ├── compiler/
 ├── runtime/
+├── gradle-plugin/
 ├── build-logic/
 ├── docs/
 └── .github/
@@ -70,6 +71,21 @@ PrevHam
 - Serves as a verification project for generated Preview code.
 - Demonstrates supported mock generation features.
 - Acts as a reference implementation for library users.
+
+---
+
+### gradle-plugin
+
+**Responsibilities**
+
+- Provides the `io.github.parkjiminnnn.prevham` Gradle plugin.
+- Declares the `runtime`, `compiler` and MockK dependencies on the consumer's behalf, at the plugin's own version.
+
+**Constraints**
+
+- Must not apply KSP. A KSP version is tied to a Kotlin version, so applying it would pin the consumer's Kotlin version to PrevHam's; the KSP Gradle plugin is `compileOnly` for the same reason.
+- Must fail with an actionable message when KSP or a Kotlin plugin is missing.
+- Behaviour is verified with Gradle TestKit, against real builds.
 
 ---
 
