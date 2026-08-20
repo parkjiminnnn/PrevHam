@@ -23,7 +23,6 @@ class GeneratedMockValueTest {
         val viewModel =
             mockk<ScreenViewModel>(relaxed = true) {
                 every { uiState } returns MutableStateFlow(ScreenUiState.Loading)
-                every { titleFor(any()) } returns "mock"
             }
 
         val state = viewModel.uiState.value
