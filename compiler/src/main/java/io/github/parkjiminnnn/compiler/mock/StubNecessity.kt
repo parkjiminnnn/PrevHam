@@ -45,28 +45,45 @@ internal class StubNecessity {
         // Checked here as well as inside the search: a literal is the whole answer, and searching
         // into one finds the standard library's generic members and reports back a false positive.
         if (type.isLiteral()) return false
-        val declaration = type.declaration as? KSClassDeclaration ?: return false
-        // The search can't say anything useful about a type it won't look inside, and looking
-        // inside a compiled dependency is what produces the false positives described below.
-        if (!declaration.isFromSource()) return false
-        val name = declaration.qualifiedName?.asString() ?: return false
+        // The search can't say anything useful about a type it won't look inside.
+        if (!type.isSearchable()) return false
+        val name = type.declaration.qualifiedName?.asString() ?: return false
+        // Keyed by declaration alone: whether a type reaches an erased member is the same question
+        // for Box<Item> and Box<Other>, since the member that erases is declared as T either way.
         return cache.getOrPut(name) { type.reachesErasedMember() }
     }
 
     /**
-     * Whether a type is declared in the sources being compiled, rather than a compiled dependency.
+     * Whether the search may look inside a type.
      *
-     * The search stops at anything else. Walking into the platform finds erased members everywhere -
-     * `Throwable` exposes `Array<StackTraceElement>`, whose `get` returns a type parameter - so
-     * practically every type would be marked as needing a stub, and stubbing that far in produces
-     * calls like `every { get(any()) }` that collide with MockK's own matcher scope and don't
-     * compile.
+     * Anything declared in the sources being compiled is fair game. A compiled dependency is entered
+     * only when it is **generic**, and that condition is doing real work in both directions.
      *
-     * The cost is that a type from another module or a library isn't searched through, so an erased
-     * member behind one isn't found. `Flow` is unaffected, being recognised directly rather than by
-     * searching.
+     * Without it, walking into the platform finds erased members everywhere - `Throwable` exposes
+     * `Array<StackTraceElement>`, whose `get` returns a type parameter - so practically every type
+     * would be marked as needing a stub. That was the state that let the generated output explode in
+     * issue #75; `java.time.LocalDate`, with 56 stubbable members over 16 mutually-referencing return
+     * types, is what actually exhausted the heap. Neither `Throwable` nor `LocalDate` has a type
+     * argument, so neither is entered.
+     *
+     * But refusing every compiled type is too blunt, and that was issue #80: `Lazy<T>.value`,
+     * `Iterator<T>.next()` and their kind erase exactly the way a source-declared generic does, and
+     * missing them puts back the `ClassCastException` from issue #59. A type with no type argument
+     * has no type parameter to erase, so the condition keeps the ones that matter and drops the ones
+     * that caused the explosion.
+     *
+     * `Flow` is unaffected either way, being recognised by [isErased] rather than by searching.
      */
-    private fun KSClassDeclaration.isFromSource(): Boolean = origin == Origin.KOTLIN || origin == Origin.JAVA
+    private fun KSType.isSearchable(): Boolean {
+        val declaration = declaration as? KSClassDeclaration ?: return false
+        if (declaration.origin == Origin.KOTLIN || declaration.origin == Origin.JAVA) return true
+        // An array is the one generic the search must not enter. `Array<T>.get` returns a type
+        // parameter, so any member holding one would be marked as needing a stub - and that stub
+        // does not compile, because `every { get(any()) }` resolves against MockKMatcherScope's
+        // own `get`. Throwable reaches two arrays this way, through stackTrace and suppressed.
+        if (declaration.qualifiedName?.asString() == KOTLIN_ARRAY_QUALIFIED_NAME) return false
+        return arguments.isNotEmpty()
+    }
 
     /**
      * A type that becomes a literal rather than a mock, so nothing is read out of it through one.
@@ -81,7 +98,14 @@ internal class StubNecessity {
             (declaration as? KSClassDeclaration)?.classKind == ClassKind.ENUM_CLASS
     }
 
-    /** A type relaxed mode can't produce a usable value for on its own. */
+    /**
+     * A type relaxed mode can't produce a usable value for on its own.
+     *
+     * `Flow` and `SharedFlow` are named rather than searched because there is nothing to find: their
+     * type parameter never appears in a return type, arriving through `collect`'s collector instead.
+     * A member walk only inspects return types, so it reports them as safe however far it is allowed
+     * to look.
+     */
     private fun KSType.isErased(): Boolean =
         declaration is KSTypeParameter ||
             declaration.qualifiedName?.asString() in KOTLINX_FLOW_QUALIFIED_NAMES
@@ -96,11 +120,12 @@ internal class StubNecessity {
      */
     private fun KSType.reachesErasedMember(): Boolean {
         val visited = mutableSetOf<String>()
-        val pending = ArrayDeque<KSClassDeclaration>()
+        val pending = ArrayDeque<KSType>()
+        pending += this
 
-        (declaration as? KSClassDeclaration)?.let { pending += it }
         while (pending.isNotEmpty()) {
-            val declaration = pending.removeFirst()
+            val current = pending.removeFirst()
+            val declaration = current.declaration as? KSClassDeclaration ?: continue
             val name = declaration.qualifiedName?.asString() ?: continue
             if (!visited.add(name)) continue
 
@@ -111,9 +136,8 @@ internal class StubNecessity {
             for (memberType in memberTypes) {
                 if (memberType.isErased()) return true
                 if (memberType.isLiteral()) continue
-                val memberDeclaration = memberType.declaration as? KSClassDeclaration ?: continue
-                if (!memberDeclaration.isFromSource()) continue
-                pending += memberDeclaration
+                if (!memberType.isSearchable()) continue
+                pending += memberType
             }
         }
         return false

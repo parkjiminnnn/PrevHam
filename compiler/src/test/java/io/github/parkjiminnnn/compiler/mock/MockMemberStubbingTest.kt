@@ -254,4 +254,32 @@ class MockMemberStubbingTest {
         val stubs = generated.split("every {").size - 1
         assertTrue("$stubs stubs", stubs <= MockContext.MAX_STUBS)
     }
+
+    @Test
+    fun `stubs a library generic held as a member`() {
+        // The erased member is Lazy.value, declared as T. Reaching it means searching inside a
+        // compiled dependency, which is what issue #80 opened up.
+        val generated =
+            generate(
+                "Held",
+                """
+                data class Item(val title: String)
+                interface HeldViewModel { val holder: Lazy<Item> }
+                """,
+            )
+
+        assertTrue(generated, generated.contains("every { holder } returns"))
+        assertTrue(generated, generated.contains("""every { value } returns Item("""))
+    }
+
+    @Test
+    fun `stubs a library generic whose erased member is one type further`() {
+        // Sequence.iterator() returns Iterator<T>, which is not erased - the erased member is
+        // Iterator.next(), one compiled type further on. Unlike the case above this fails in
+        // parameter position too, so the search has to cross more than one compiled type.
+        val generated = generate("Walk", "data class Item(val title: String)", parameter = "items: Sequence<Item>")
+
+        assertTrue(generated, generated.contains("every { iterator() } returns"))
+        assertTrue(generated, generated.contains("""every { next() } returns Item("""))
+    }
 }

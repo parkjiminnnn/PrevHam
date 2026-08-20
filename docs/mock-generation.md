@@ -236,10 +236,17 @@ Two boundaries keep that search honest, both learned by measuring:
 - **It stops at literals.** The standard library is full of generic members; walk into `String` and a
   couple of hops later `Iterator<T>.next()` reports "erased", which would mark practically every type
   as needing a stub.
-- **It stops at compiled dependencies.** `Throwable` reaches an erased member through
-  `Array<StackTraceElement>.get`, and stubbing that far in emits `every { get(any()) }`, which
-  collides with MockK's matcher scope and doesn't compile. The cost is that an erased member behind a
-  library type isn't found; `Flow` is unaffected, being recognised directly rather than by searching.
+- **It enters a compiled dependency only when the type is generic.** A type with no type argument has
+  no type parameter to erase, and entering those is what made the search useless: `Throwable` reaches
+  an erased member through `Array<StackTraceElement>.get`, and `java.time.LocalDate` — 56 stubbable
+  members over 16 mutually-referencing return types — is what exhausted the heap in issue #75.
+  Neither carries a type argument. A generic one does erase, exactly the way a declared generic does:
+  `Lazy<T>.value` and `Iterator<T>.next()` are `T` just as `Box<T>.value` is, and refusing to enter
+  them left the issue #59 crash in place for anything held behind a mock (issue #80). `kotlin.Array`
+  is excluded by name despite being generic — `every { get(any()) }` resolves against MockK's matcher
+  scope rather than the mock and doesn't compile (issue #83). `Flow` is unaffected either way, being
+  recognised directly rather than by searching: its type parameter never appears in a return type, so
+  no amount of searching would find it.
 
 Narrowing makes the blow-up rare rather than impossible — a graph whose every branch leads to
 something erased still expands along all of them — so `MockContext.MAX_STUBS` caps the total for one
