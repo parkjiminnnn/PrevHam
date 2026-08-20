@@ -36,7 +36,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Nested data classes | Recursive mock generation for nested data classes and collections, as deep as the model goes — bounded by cycle detection, not a depth limit |
 | Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
 | Sealed type support | Builds a real subtype (e.g. `UiState.Loading`) instead of mocking the sealed type |
-| Mock member stubbing | Stubs a mock's properties and functions up front — including `StateFlow`/`Flow` members — so Preview rendering never depends on MockK's recursive relaxed mocking |
+| Mock member stubbing | Stubs the members MockK's relaxed mode can't answer — those whose type erases, such as `StateFlow`/`Flow` — and leaves the rest to relaxed mode, so a mock stays as small as the Preview needs |
 | Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
 | Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
 | Preview variants | Dark mode, locale, font scale, and device variants from one `@Prev` |

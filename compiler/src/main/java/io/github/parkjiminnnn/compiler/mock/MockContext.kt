@@ -25,7 +25,22 @@ internal class MockContext private constructor(
     private val expanding: Set<String>,
     private val remainingSteps: Int,
     private val isBlocked: Boolean,
+    private val stubBudget: StubBudget,
 ) {
+    /**
+     * Whether another member stub can still be afforded for this composable, consuming one if so.
+     *
+     * The path bound above limits how *deep* generation goes, not how *wide*. A graph whose every
+     * branch leads to something that must be stubbed produces stubs as the product of its member
+     * counts, which is what exhausted the heap in issue #75; narrowing what gets stubbed made that
+     * rare rather than impossible.
+     *
+     * Deliberately consumed only while generating, never while deciding: [canMock] stays free of
+     * side effects, and running out degrades a mock to a bare one rather than making a type look
+     * unsupported.
+     */
+    fun canAffordStub(): Boolean = stubBudget.tryConsume()
+
     /** Whether an inner type can be mocked from here, without expanding it. */
     fun canMock(type: KSType): Boolean {
         if (isBlocked) return false
@@ -41,9 +56,11 @@ internal class MockContext private constructor(
         // `data class Node(val next: Node)` case. Anything finite, however deeply nested, never
         // repeats a key and runs to completion.
         if (remainingSteps == 0 || key in expanding) {
-            return MockContext(registry, expanding, remainingSteps = 0, isBlocked = true)
+            return MockContext(registry, expanding, remainingSteps = 0, isBlocked = true, stubBudget)
         }
-        return MockContext(registry, expanding + key, remainingSteps - 1, isBlocked = false)
+        // The budget is shared rather than copied - it bounds the whole composable's output, not
+        // one path through it.
+        return MockContext(registry, expanding + key, remainingSteps - 1, isBlocked = false, stubBudget)
     }
 
     // Type arguments belong in the key: keyed on the declaration alone, the outer and inner Box of
@@ -69,7 +86,29 @@ internal class MockContext private constructor(
         // supported depth limit.
         const val MAX_PATH_LENGTH = 64
 
+        // Far more stubs than any real dependency graph produces, so it never shapes ordinary
+        // output - it exists so a pathological graph degrades to bare mocks instead of a heap dump
+        // or a "Method too large" from the Kotlin backend.
+        const val MAX_STUBS = 500
+
         fun root(registry: MockGeneratorRegistry): MockContext =
-            MockContext(registry, expanding = emptySet(), remainingSteps = MAX_PATH_LENGTH, isBlocked = false)
+            MockContext(
+                registry,
+                expanding = emptySet(),
+                remainingSteps = MAX_PATH_LENGTH,
+                isBlocked = false,
+                stubBudget = StubBudget(MAX_STUBS),
+            )
+    }
+}
+
+/** Counts member stubs across one composable's generation, so width can be bounded as well as depth. */
+internal class StubBudget(
+    private var remaining: Int,
+) {
+    fun tryConsume(): Boolean {
+        if (remaining <= 0) return false
+        remaining--
+        return true
     }
 }

@@ -23,7 +23,7 @@ the same type.
 | `StringMockGenerator` | `String` | `"mock"` |
 | `EnumMockGenerator` | Enum classes | `Status.ACTIVE` (first declared entry) |
 | `SealedTypeMockGenerator` | Sealed interfaces and sealed classes | `UiState.Loading` |
-| `InterfaceMockGenerator` | Interfaces, and non-data classes not owned by another generator | `mockk<ImageLoader>(relaxed = true) { every { url } returns "mock" }` |
+| `InterfaceMockGenerator` | Interfaces, and non-data classes not owned by another generator | `mockk<ImageLoader>(relaxed = true)`, with stubs only for members relaxed mode can't answer |
 | `DataClassMockGenerator` | Data classes | `User(id = 1, name = "mock", age = 1)` |
 | `CollectionMockGenerator` | `List`, `Set`, `Map` | `listOf(1)`, `mapOf("mock" to 1)` |
 | `FunctionTypeMockGenerator` | `() -> R` and other `kotlin.FunctionN` types | `{ }`, `{ 1 }` |
@@ -108,8 +108,11 @@ interface to a bare relaxed mock. Stopping should cost one member, not the whole
 ```kotlin
 data class Node(val value: Int, val next: Node?)   // Node(value = 1, next = null)
 data class Node(val next: Node)                    // skipped - no such value exists in any code
-interface Node { val next: Node }                  // mockk { every { next } returns mockk() }
+interface Node { val next: Node }                  // mockk<Node>(relaxed = true)
 ```
+
+The interface case reaches the bound only when `next` is stubbed at all, which takes an erased member
+somewhere below it — see [which members get stubbed](#which-members-get-stubbed).
 
 The path key carries type arguments, not just the declaration. Keyed on the declaration alone, the
 outer and inner `Box` of a finite `Box<Box<Item>>` would look like the same type and be rejected.
@@ -192,18 +195,60 @@ java.lang.ClassCastException: class java.lang.Object cannot be cast to class Fes
 
 That was issue #59. (The classloader names such a message carries are just how the JVM formats a
 `ClassCastException`; they aren't evidence of a classloader problem — `GeneratedMockValueTest` in
-`sample` reproduces this in an ordinary JVM unit test.) So the generator stubs every member it can
-build a value for, up front, using `mockk()`'s own trailing-lambda DSL:
+`sample` reproduces this in an ordinary JVM unit test.) So the generator stubs the members that hit
+that, up front, using `mockk()`'s own trailing-lambda DSL:
 
 ```kotlin
 mockk<ScreenStateHolder>(relaxed = true) {
     every { uiState } returns MutableStateFlow(ScreenUiState.Loading)
-    every { titleFor(any()) } returns "mock"
 }
 ```
 
-A stubbed member never reaches MockK's relaxed fallback, so it never takes the recursive path.
-`relaxed = true` stays on to cover what's left. The rules:
+A stubbed member never reaches MockK's relaxed fallback, so it never has to recover a value from an
+erased type. `relaxed = true` stays on to cover what's left.
+
+### Which members get stubbed
+
+Only the ones relaxed mode can't answer. A concrete return type survives erasure and relaxed mode
+produces a usable value for it — `titleFor(state): String` above needs nothing. What it can't answer
+is a type that erases away: a **type parameter** becomes `Object`, and so does whatever is read out
+of a **`Flow`** (`StateFlow<T>.value`).
+
+Stubbing every member instead of only those was the original implementation, and it made each member
+a branch: the mock for a member is another mock, whose members are stubbed in turn, so output grew as
+the product of the member counts across the graph until it exhausted the heap (issue #75).
+
+A member also has to be stubbed when it merely *leads* to one that does:
+
+```kotlin
+interface Outer  { val middle: Middle }              // not erased itself...
+interface Middle { val inner: Inner }
+interface Inner  { val items: StateFlow<Item> }      // ...but this is
+```
+
+Left out, relaxed mode invents the mocks in between and `items` can never be reached. So
+`StubNecessity` asks "does anything reachable from here need a stub", searching the type graph rather
+than looking at the member alone. Only paths that reach something erased get built, which is what
+leaves a graph with nothing erased in it — the issue #75 shape — expanded not at all.
+
+Two boundaries keep that search honest, both learned by measuring:
+
+- **It stops at literals.** The standard library is full of generic members; walk into `String` and a
+  couple of hops later `Iterator<T>.next()` reports "erased", which would mark practically every type
+  as needing a stub.
+- **It stops at compiled dependencies.** `Throwable` reaches an erased member through
+  `Array<StackTraceElement>.get`, and stubbing that far in emits `every { get(any()) }`, which
+  collides with MockK's matcher scope and doesn't compile. The cost is that an erased member behind a
+  library type isn't found; `Flow` is unaffected, being recognised directly rather than by searching.
+
+Narrowing makes the blow-up rare rather than impossible — a graph whose every branch leads to
+something erased still expands along all of them — so `MockContext.MAX_STUBS` caps the total for one
+composable. It sits far above anything a real graph produces; past it, a mock is emitted bare rather
+than with stubs. Unlike the path bound, it is shared across the whole generation rather than copied
+per path, and it is consumed only while generating, never while deciding, so `canMock` stays free of
+side effects.
+
+### What is emitted
 
 | Member shape | Emitted |
 |---|---|
@@ -212,15 +257,17 @@ A stubbed member never reaches MockK's relaxed fallback, so it never takes the r
 | Function | `every { name(any(), any()) } returns <mock>` — one matcher per parameter |
 | `suspend` function | the same, with `coEvery` |
 
-Stubbing is best-effort: a member is skipped, and left to relaxed mode, when it returns `Unit`, when
-no generator supports its type, when it's non-public or an extension, when it declares its own type
-parameters (its return type would still mention them), or when it takes a `vararg` (matching one takes
-a spread of the matcher for its exact element type, `*anyLongVararg()` / `*anyVararg()` / …, and
-guessing wrong emits a stub that doesn't compile). `equals`/`hashCode`/`toString` are skipped too —
-MockK relies on its own answers for those. Member types are resolved through `asMemberOf`, so a
-`Holder<String>`'s `val value: T` is stubbed with `"mock"`, not left unresolved. Because stubbing
-descends through the context, a self-referential interface (`interface Node { val next: Node }`)
-stops one level down with a mock that stubs nothing.
+Beyond the narrowing above, a member is also skipped when it returns `Unit`, when no generator
+supports its type, when it's non-public or an extension, when it declares its own type parameters
+(its return type would still mention them), or when it takes a `vararg` (matching one takes a spread
+of the matcher for its exact element type, `*anyLongVararg()` / `*anyVararg()` / …, and guessing
+wrong emits a stub that doesn't compile). `equals`/`hashCode`/`toString` are skipped too — MockK
+relies on its own answers for those.
+
+Member types are resolved through `asMemberOf`, so a `Holder<String>`'s `val value: T` is stubbed
+with `"mock"` rather than left unresolved. The containing type is made non-null first: `asMemberOf`
+rejects a nullable one outright, and the exception would fail the whole KSP round rather than one
+member (issue #74).
 
 **`CollectionMockGenerator`** matches `List`/`Set`/`Map` by qualified name, resolves each type
 argument through the context, and picks `listOf`/`setOf`/`mapOf` accordingly. `Map`'s two type

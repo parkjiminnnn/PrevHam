@@ -25,8 +25,11 @@ import kotlinx.coroutines.flow.asStateFlow
 //
 //     mockk<ScreenViewModel>(relaxed = true) {
 //         every { uiState } returns MutableStateFlow(ScreenUiState.Loading)
-//         every { titleFor(any()) } returns "mock"
 //     }
+//
+// Only `uiState` is stubbed. `titleFor` returns a String, which relaxed mode answers on its own -
+// stubbing members that don't need it is what made generation grow with the size of the dependency
+// graph (issue #75).
 //
 // MockCastingTest in src/test asserts that the value this expression produces really does pass the
 // `is` checks below, rather than being another mock.

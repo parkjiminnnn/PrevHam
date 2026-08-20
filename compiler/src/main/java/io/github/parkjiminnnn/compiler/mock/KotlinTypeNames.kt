@@ -27,3 +27,19 @@ internal val KOTLINX_FLOW_QUALIFIED_NAMES =
         "kotlinx.coroutines.flow.StateFlow",
         "kotlinx.coroutines.flow.MutableStateFlow",
     )
+
+// The types that become a literal rather than a mock - PrimitiveMockGenerator's and
+// StringMockGenerator's territory. Shared with StubNecessity, which stops searching at them: a
+// literal has no members read through a mock, so nothing below one can need stubbing.
+internal val KOTLIN_LITERAL_QUALIFIED_NAMES =
+    setOf(
+        "kotlin.Int",
+        "kotlin.Long",
+        "kotlin.Short",
+        "kotlin.Byte",
+        "kotlin.Double",
+        "kotlin.Float",
+        "kotlin.Boolean",
+        "kotlin.Char",
+        "kotlin.String",
+    )

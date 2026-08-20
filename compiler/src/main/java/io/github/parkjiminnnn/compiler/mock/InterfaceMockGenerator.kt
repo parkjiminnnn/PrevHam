@@ -1,11 +1,7 @@
 package io.github.parkjiminnnn.compiler.mock
 
-import com.google.devtools.ksp.isConstructor
-import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
@@ -34,6 +30,8 @@ import com.squareup.kotlinpoet.TypeName
  * isn't enumerated here.
  */
 internal class InterfaceMockGenerator : MockGenerator {
+    private val stubNecessity = StubNecessity()
+
     override fun supports(
         type: KSType,
         context: MockContext,
@@ -83,7 +81,15 @@ internal class InterfaceMockGenerator : MockGenerator {
         getAllProperties()
             .filter { it.isStubbable() }
             .mapNotNull { property ->
-                val value = context.stubValue(property.asMemberOf(containing)) ?: return@mapNotNull null
+                if (!stubNecessity.isNeededFor(property.type.resolve())) return@mapNotNull null
+                if (!context.canAffordStub()) return@mapNotNull null
+                // asMemberOf rejects a nullable containing type outright ("Logger? is not a sub
+                // type of the class/interface that contains `name`"), and the exception would fail
+                // the whole KSP round. Nullability of the reference doesn't change a member's type,
+                // so the question is asked in the form KSP accepts (issue #74).
+                val value =
+                    context.stubValue(property.asMemberOf(containing.makeNotNullable()))
+                        ?: return@mapNotNull null
                 CodeBlock.of("%M { %L } returns %L\n", EVERY_FUNCTION, property.simpleName.asString(), value)
             }.toList()
 
@@ -94,7 +100,10 @@ internal class InterfaceMockGenerator : MockGenerator {
         getAllFunctions()
             .filter { it.isStubbable() }
             .mapNotNull { function ->
-                val returnType = function.asMemberOf(containing).returnType ?: return@mapNotNull null
+                val declaredReturn = function.returnType?.resolve() ?: return@mapNotNull null
+                if (!stubNecessity.isNeededFor(declaredReturn)) return@mapNotNull null
+                if (!context.canAffordStub()) return@mapNotNull null
+                val returnType = function.asMemberOf(containing.makeNotNullable()).returnType ?: return@mapNotNull null
                 val value = context.stubValue(returnType) ?: return@mapNotNull null
                 // An argument matcher per parameter: PrevHam can't know which arguments the
                 // previewed code will pass, so every call gets the same stubbed value.
@@ -108,22 +117,6 @@ internal class InterfaceMockGenerator : MockGenerator {
                     value,
                 )
             }.toList()
-
-    private fun KSPropertyDeclaration.isStubbable(): Boolean = isPublic() && extensionReceiver == null
-
-    private fun KSFunctionDeclaration.isStubbable(): Boolean {
-        if (!isPublic() || isConstructor() || extensionReceiver != null) return false
-        // Matching a vararg parameter takes a spread of the matcher for its exact element type
-        // (*anyLongVararg(), *anyVararg(), ...). Guessing that wrong emits a stub that doesn't
-        // compile, which is worse than leaving a rare member to relaxed mode.
-        if (parameters.any { it.isVararg }) return false
-        // equals/hashCode/toString come from Any on every type. MockK relies on its own answers for
-        // those, and stubbing them would break how it identifies and prints the mock.
-        if (parentDeclaration?.qualifiedName?.asString() == KOTLIN_ANY_QUALIFIED_NAME) return false
-        // A generic function's return type still mentions its own type parameters here, so there is
-        // no concrete type to build a value for.
-        return typeParameters.isEmpty()
-    }
 
     // The value to stub a member with, or null to leave that member to relaxed mode - either
     // because there is nothing worth stubbing (Unit) or because no generator can build its type.
