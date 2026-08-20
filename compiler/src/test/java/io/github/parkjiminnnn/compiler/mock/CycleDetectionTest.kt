@@ -5,6 +5,7 @@ import com.tschuchort.compiletesting.SourceFile
 import io.github.parkjiminnnn.compiler.testing.compilePrev
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -126,8 +127,42 @@ class CycleDetectionTest {
 
         assertEquals(result.messages, KotlinCompilation.ExitCode.OK, result.exitCode)
         val generated = requireNotNull(result.generatedFile("ChainCardPreview.kt"))
-        // An interface needs nothing expanded to be mocked, so the revisit costs only the stub one
-        // level down - the chain stops with a bare mock instead of going on forever.
+        // `next` returns a concrete type, which relaxed mode answers on its own, so it isn't stubbed
+        // and the chain never starts. Were it erased, the cycle guard is what would stop it - see
+        // `bounds a self-referential chain of stubbed members`.
+        assertEquals(generated, 1, generated.split("mockk<Node>(relaxed = true)").size - 1)
+        assertFalse(generated, generated.contains("every { next }"))
+    }
+
+    @Test
+    fun `bounds a self-referential chain of stubbed members`() {
+        val result =
+            compilePrev(
+                SourceFile.kotlin(
+                    "LoopCard.kt",
+                    """
+                    package test
+                    import androidx.compose.runtime.Composable
+                    import io.github.parkjiminnnn.runtime.Prev
+                    import kotlinx.coroutines.flow.StateFlow
+
+                    data class Item(val title: String)
+                    interface Node {
+                        val next: Node
+                        val items: StateFlow<Item>
+                    }
+
+                    @Prev
+                    @Composable
+                    fun LoopCard(node: Node) {}
+                    """,
+                ),
+            )
+
+        assertEquals(result.messages, KotlinCompilation.ExitCode.OK, result.exitCode)
+        val generated = requireNotNull(result.generatedFile("LoopCardPreview.kt"))
+        // `next` leads to an erased member so it is stubbed, which makes the type expand into
+        // itself. Re-entering Node is what stops it, one level down, with a mock that stubs nothing.
         assertEquals(generated, 2, generated.split("mockk<Node>(relaxed = true)").size - 1)
         assertEquals(generated, 1, generated.split("every { next }").size - 1)
     }
