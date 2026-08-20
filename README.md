@@ -100,7 +100,7 @@ fun UserCard(
 // build.gradle.kts
 plugins {
     id("com.google.devtools.ksp") version "2.2.10-2.0.2"
-    id("io.github.parkjiminnnn.prevham") version "1.1.0"
+    id("io.github.parkjiminnnn.prevham") version "1.1.1"
 }
 ```
 
@@ -119,8 +119,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.parkjiminnnn:prevham-runtime:1.1.0")
-    ksp("io.github.parkjiminnnn:prevham-compiler:1.1.0")
+    implementation("io.github.parkjiminnnn:prevham-runtime:1.1.1")
+    ksp("io.github.parkjiminnnn:prevham-compiler:1.1.1")
 
     // Required if any @Prev composable has an interface or non-data-class parameter
     // (e.g. Modifier) — PrevHam mocks those with MockK's mockk<T>(relaxed = true).
