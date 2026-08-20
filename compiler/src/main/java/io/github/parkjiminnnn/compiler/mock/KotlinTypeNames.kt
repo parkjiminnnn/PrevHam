@@ -13,6 +13,11 @@ internal const val KOTLIN_MAP_QUALIFIED_NAME = "kotlin.collections.Map"
 internal val KOTLIN_COLLECTION_QUALIFIED_NAMES =
     setOf(KOTLIN_LIST_QUALIFIED_NAME, KOTLIN_SET_QUALIFIED_NAME, KOTLIN_MAP_QUALIFIED_NAME)
 
+// kotlin.Array is never entered by the stub search: its `get` returns a type parameter, and the
+// stub that would follow does not compile - `every { get(any()) }` resolves against
+// MockKMatcherScope.DynamicCall rather than the mock. See StubNecessity.isSearchable.
+internal const val KOTLIN_ARRAY_QUALIFIED_NAME = "kotlin.Array"
+
 internal const val KOTLIN_ANY_QUALIFIED_NAME = "kotlin.Any"
 internal const val KOTLIN_UNIT_QUALIFIED_NAME = "kotlin.Unit"
 
