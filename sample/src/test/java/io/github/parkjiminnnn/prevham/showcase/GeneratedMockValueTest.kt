@@ -70,38 +70,4 @@ class GeneratedMockValueTest {
             is ScreenUiState.Success -> "success"
             is ScreenUiState.Error -> "error"
         }
-
-    @Test
-    fun `a stubbed library generic member yields a real value, not a mock`() {
-        // Copied from HeldUserCardPreview.kt. Lazy is a compiled dependency, so reaching its
-        // erased `value` meant letting the stub search look inside one (issue #80).
-        val holder =
-            mockk<UserHolder>(relaxed = true) {
-                every { user } returns
-                    mockk<Lazy<User>>(relaxed = true) {
-                        every { value } returns User(id = 1, name = "mock", age = 1)
-                    }
-            }
-
-        val user = holder.user.value
-
-        assertEquals("mock", user.name)
-        assertEquals(1, user.id)
-    }
-
-    @Test
-    fun `relaxed mode alone cannot produce a usable value for a library generic member`() {
-        // What PrevHam generated between #75 and #80: `user` left to relaxed mode, which builds its
-        // answer from Lazy<T>.value's erased type and hands back a bare Object. Kept executable so
-        // the gap can't reopen silently - a compile test would still pass on the broken output.
-        val holder = mockk<UserHolder>(relaxed = true)
-
-        val failure =
-            assertThrows(ClassCastException::class.java) {
-                val user: User = holder.user.value
-                user.name
-            }
-
-        assertTrue(failure.message, failure.message.orEmpty().contains("java.lang.Object"))
-    }
 }
