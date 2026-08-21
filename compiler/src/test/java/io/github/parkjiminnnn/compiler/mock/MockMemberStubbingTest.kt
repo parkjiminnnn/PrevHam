@@ -256,30 +256,37 @@ class MockMemberStubbingTest {
     }
 
     @Test
-    fun `stubs a library generic held as a member`() {
-        // The erased member is Lazy.value, declared as T. Reaching it means searching inside a
-        // compiled dependency, which is what issue #80 opened up.
+    fun `does not expand a compiled type held as a data class field`() {
+        // The shape issue #75 was reported with, and the one that actually triggers the explosion.
+        // A data class field is a constructor argument, so the mock for its type is built directly
+        // instead of being gated by StubNecessity - and all 56 of LocalDate's members are then
+        // enumerated, with anything the search is willing to enter becoming a branch.
+        //
+        // The equivalent interface member does not reach that path at all, which is how issue #87
+        // shipped: the regression test written for #75 used a synthetic interface graph, which
+        // reproduced the size of the explosion but not its trigger.
+        //
+        // Asserted as a count plus a successful compile rather than on the generated text: the
+        // failure mode is hundreds of mocks that don't compile, and a text assertion reads that as
+        // a pass.
         val generated =
             generate(
-                "Held",
-                """
-                data class Item(val title: String)
-                interface HeldViewModel { val holder: Lazy<Item> }
-                """,
+                "Festival",
+                "data class Festival(val name: String, val startDate: java.time.LocalDate)",
+                parameter = "festival: Festival",
             )
 
-        assertTrue(generated, generated.contains("every { holder } returns"))
-        assertTrue(generated, generated.contains("""every { value } returns Item("""))
+        val mocks = generated.split("mockk<").size - 1
+        assertTrue("$mocks mocks:\n$generated", mocks <= 2)
+        assertFalse(generated, generated.contains("Stream<"))
     }
 
     @Test
-    fun `stubs a library generic whose erased member is one type further`() {
-        // Sequence.iterator() returns Iterator<T>, which is not erased - the erased member is
-        // Iterator.next(), one compiled type further on. Unlike the case above this fails in
-        // parameter position too, so the search has to cross more than one compiled type.
-        val generated = generate("Walk", "data class Item(val title: String)", parameter = "items: Sequence<Item>")
+    fun `does not expand a compiled type passed directly`() {
+        // Same path as above without the data class: a parameter's type is mocked directly too.
+        val generated = generate("Day", "", parameter = "date: java.time.LocalDate")
 
-        assertTrue(generated, generated.contains("every { iterator() } returns"))
-        assertTrue(generated, generated.contains("""every { next() } returns Item("""))
+        val mocks = generated.split("mockk<").size - 1
+        assertTrue("$mocks mocks:\n$generated", mocks <= 2)
     }
 }
