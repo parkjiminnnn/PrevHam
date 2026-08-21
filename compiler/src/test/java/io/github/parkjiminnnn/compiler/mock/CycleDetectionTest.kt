@@ -131,7 +131,7 @@ class CycleDetectionTest {
         // and the chain never starts. Were it erased, the cycle guard is what would stop it - see
         // `bounds a self-referential chain of stubbed members`.
         assertEquals(generated, 1, generated.split("mockk<Node>(relaxed = true)").size - 1)
-        assertFalse(generated, generated.contains("every { next }"))
+        assertFalse(generated, generated.contains("every { this@mockk.next }"))
     }
 
     @Test
@@ -164,7 +164,7 @@ class CycleDetectionTest {
         // `next` leads to an erased member so it is stubbed, which makes the type expand into
         // itself. Re-entering Node is what stops it, one level down, with a mock that stubs nothing.
         assertEquals(generated, 2, generated.split("mockk<Node>(relaxed = true)").size - 1)
-        assertEquals(generated, 1, generated.split("every { next }").size - 1)
+        assertEquals(generated, 1, generated.split("every { this@mockk.next }").size - 1)
     }
 
     @Test
@@ -334,6 +334,6 @@ class CycleDetectionTest {
         // is finite, so the path key has to carry type arguments or this would be rejected.
         assertTrue(generated, generated.contains("mockk<Box<Box<Item>>>(relaxed = true) {"))
         assertTrue(generated, generated.contains("mockk<Box<Item>>(relaxed = true) {"))
-        assertTrue(generated, generated.contains("""every { item } returns Item("""))
+        assertTrue(generated, generated.contains("""every { this@mockk.item } returns Item("""))
     }
 }

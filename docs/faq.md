@@ -74,7 +74,7 @@ PrevHam now stubs the members it can build values for up front:
 
 ```kotlin
 mockk<HomeViewModel>(relaxed = true) {
-    every { uiState } returns MutableStateFlow(FestivalUiState.Loading)
+    every { this@mockk.uiState } returns MutableStateFlow(FestivalUiState.Loading)
 }
 ```
 
