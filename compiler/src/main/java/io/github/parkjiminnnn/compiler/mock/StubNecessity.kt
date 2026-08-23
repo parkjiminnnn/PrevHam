@@ -40,7 +40,11 @@ internal class StubNecessity {
     private val cache = mutableMapOf<String, Boolean>()
 
     /** Whether a member declaring [type] has to be stubbed rather than left to relaxed mode. */
-    fun isNeededFor(type: KSType): Boolean {
+    fun isNeededFor(declaredType: KSType): Boolean {
+        // A member declared with a typealias reaches here as the alias, which knows nothing about
+        // what it stands for - a `typealias Items = StateFlow<Item>` would not be recognised as a
+        // Flow and the member would be left to relaxed mode (issue #81).
+        val type = declaredType.resolveTypeAliases()
         if (type.isErased()) return true
         // Checked here as well as inside the search: a literal is the whole answer, and searching
         // into one finds the standard library's generic members and reports back a false positive.
@@ -104,8 +108,8 @@ internal class StubNecessity {
             if (!visited.add(name)) continue
 
             val memberTypes =
-                declaration.getAllProperties().filter { it.isStubbable() }.map { it.type.resolve() } +
-                    declaration.getAllFunctions().filter { it.isStubbable() }.mapNotNull { it.returnType?.resolve() }
+                declaration.getAllProperties().filter { it.isStubbable() }.map { it.type.resolve().resolveTypeAliases() } +
+                    declaration.getAllFunctions().filter { it.isStubbable() }.mapNotNull { it.returnType?.resolve()?.resolveTypeAliases() }
 
             for (memberType in memberTypes) {
                 if (memberType.isErased()) return true

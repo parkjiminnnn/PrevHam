@@ -125,7 +125,10 @@ internal class InterfaceMockGenerator : MockGenerator {
 
     // The value to stub a member with, or null to leave that member to relaxed mode - either
     // because there is nothing worth stubbing (Unit) or because no generator can build its type.
-    private fun MockContext.stubValue(type: KSType): CodeBlock? {
+    private fun MockContext.stubValue(declaredType: KSType): CodeBlock? {
+        // Resolved before the Flow check: an alias for a Flow has to take the real-flow branch
+        // below rather than being mocked like any other type (issue #81).
+        val type = declaredType.resolveTypeAliases()
         val qualifiedName = type.declaration.qualifiedName?.asString()
         if (qualifiedName == KOTLIN_UNIT_QUALIFIED_NAME) return null
         if (qualifiedName !in KOTLINX_FLOW_QUALIFIED_NAMES) {

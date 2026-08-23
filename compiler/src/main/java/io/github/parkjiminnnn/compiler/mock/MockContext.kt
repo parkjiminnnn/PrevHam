@@ -44,11 +44,15 @@ internal class MockContext private constructor(
     /** Whether an inner type can be mocked from here, without expanding it. */
     fun canMock(type: KSType): Boolean {
         if (isBlocked) return false
-        return registry.supports(type, descend(type))
+        val resolved = type.resolveTypeAliases()
+        return registry.supports(resolved, descend(resolved))
     }
 
     /** The mock for an inner type. Only valid when [canMock] returned true for the same type. */
-    fun mock(type: KSType): CodeBlock = registry.generate(type, descend(type))
+    fun mock(type: KSType): CodeBlock {
+        val resolved = type.resolveTypeAliases()
+        return registry.generate(resolved, descend(resolved))
+    }
 
     private fun descend(type: KSType): MockContext {
         val key = type.pathKey()

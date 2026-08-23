@@ -131,6 +131,35 @@ constructed in ordinary code either, but the declaration is legal and must not h
 `MAX_PATH_LENGTH` caps the path at 64. That is a safety net for pathological declarations, not a
 supported nesting limit — real models are nowhere near it.
 
+
+## Type aliases: resolved before dispatch
+
+A `typealias` is a second name for a type rather than a type of its own, but KSP reports it as a
+`KSTypeAlias` declaration. Every generator narrows with `type.declaration as? KSClassDeclaration`,
+so an aliased type matched nothing and the whole Preview was skipped — issue #81. This was never
+limited to aliases a user writes: `kotlin.Comparator` is an alias for `java.util.Comparator`, so the
+same parameter was supported or not depending on which name it was spelled with.
+
+`MockContext.canMock` and `mock` resolve the alias before consulting the registry, so the generators
+only ever see real class declarations. Resolving there rather than in each generator also keeps the
+path key honest — cycle detection compares expanded types, so `Node` and an alias for it are one
+type on the path rather than two.
+
+Three other places read a declared type without going through the context, and resolve for the same
+reason: `StubNecessity.isNeededFor` and its search, which would otherwise not recognise
+`typealias Items = StateFlow<Item>` as a Flow, and `InterfaceMockGenerator.stubValue`, which chooses
+between a real `MutableStateFlow` and a mock by qualified name.
+
+Nullability comes from the use site, not the alias: `MyItem?` stays nullable after expanding to
+`Item`.
+
+An alias that declares its own type parameters has the use site's arguments applied to them —
+`typealias PagedList<T> = List<T>` used as `PagedList<User>` becomes `List<User>`, not `List<T>`.
+`KSType.replace` is positional, so this is exact only when the right-hand side applies the alias's
+parameters in declaration order. `typealias Swapped<A, B> = Pair<B, A>` and
+`typealias Nested<T> = Box<Box<T>>` are deliberately not resolved: substituting positionally would
+produce code that compiles and mocks the wrong types, so they stay unsupported instead, which is
+what every alias did before.
 ## `MockParameter`: decoupling "what to mock" from "how its type was found"
 
 ```kotlin
