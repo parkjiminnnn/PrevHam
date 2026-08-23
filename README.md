@@ -39,6 +39,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Mock member stubbing | Stubs the members MockK's relaxed mode can't answer — those whose type erases, such as `StateFlow`/`Flow` — and leaves the rest to relaxed mode, so a mock stays as small as the Preview needs |
 | Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
 | Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
+| Type alias support | Resolves a `typealias` to the type it stands for, so an aliased parameter, field or member reaches the same generator the underlying type would |
 | Preview variants | Dark mode, locale, font scale, and device variants from one `@Prev` |
 | Preview settings | `name`, `group`, `apiLevel`, `widthDp`/`heightDp`, `showSystemUi`, `showBackground`, `backgroundColor`, `wallpaper` applied to every generated `@Preview` |
 
