@@ -58,9 +58,8 @@ internal class StubNecessity {
      *
      * The search stops at anything else. Walking into the platform finds erased members everywhere -
      * `Throwable` exposes `Array<StackTraceElement>`, whose `get` returns a type parameter - so
-     * practically every type would be marked as needing a stub, and stubbing that far in produces
-     * calls like `every { get(any()) }` that collide with MockK's own matcher scope and don't
-     * compile.
+     * practically every type would be marked as needing a stub, which is the state generation
+     * exploded from in issue #75.
      *
      * The cost is that a type from another module or a library isn't searched through, so an erased
      * member behind one isn't found. `Flow` is unaffected, being recognised directly rather than by

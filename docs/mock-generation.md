@@ -200,7 +200,7 @@ that, up front, using `mockk()`'s own trailing-lambda DSL:
 
 ```kotlin
 mockk<ScreenStateHolder>(relaxed = true) {
-    every { uiState } returns MutableStateFlow(ScreenUiState.Loading)
+    every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
 }
 ```
 
@@ -237,9 +237,9 @@ Two boundaries keep that search honest, both learned by measuring:
   couple of hops later `Iterator<T>.next()` reports "erased", which would mark practically every type
   as needing a stub.
 - **It stops at compiled dependencies.** `Throwable` reaches an erased member through
-  `Array<StackTraceElement>.get`, and stubbing that far in emits `every { get(any()) }`, which
-  collides with MockK's matcher scope and doesn't compile. The cost is that an erased member behind a
-  library type isn't found; `Flow` is unaffected, being recognised directly rather than by searching.
+  `Array<StackTraceElement>.get`, and following that marks practically every type as needing a stub —
+  the state generation exploded from in issue #75. The cost is that an erased member behind a library
+  type isn't found; `Flow` is unaffected, being recognised directly rather than by searching.
 
 Narrowing makes the blow-up rare rather than impossible — a graph whose every branch leads to
 something erased still expands along all of them — so `MockContext.MAX_STUBS` caps the total for one
@@ -252,9 +252,9 @@ side effects.
 
 | Member shape | Emitted |
 |---|---|
-| Property | `every { name } returns <mock>` |
+| Property | `every { this@mockk.name } returns <mock>` |
 | Property or function returning `Flow`/`SharedFlow`/`StateFlow`/`Mutable*` | `... returns MutableStateFlow(<mock of the element type>)` |
-| Function | `every { name(any(), any()) } returns <mock>` — one matcher per parameter |
+| Function | `every { this@mockk.name(any(), any()) } returns <mock>` — one matcher per parameter |
 | `suspend` function | the same, with `coEvery` |
 
 Beyond the narrowing above, a member is also skipped when it returns `Unit`, when no generator

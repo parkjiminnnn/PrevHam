@@ -42,3 +42,45 @@ fun RepoCard(repository: Repository<String>) {
 fun LoggerCard(logger: Logger<String>) {
     Text(text = "logger")
 }
+
+// MockKMatcherScope declares members of its own - get, invoke, less and hint among them - and inside
+// every { } it is the innermost receiver, so an unqualified member name resolves against MockK's
+// rather than the mock's and the generated code doesn't compile (issue #83). Whether a name actually
+// collides depends on its arity and parameter types too, so stubs name their receiver instead of
+// avoiding a list of names. `this@mockk` labels the lambda passed to mockk(), whose receiver is
+// declared T.() -> Unit, so it is the mock - and in a nested mock it binds to the nearest enclosing
+// one.
+//
+// The generated arguments for the two parameters below:
+//
+//     repository = mockk<KeyedRepository<User>>(relaxed = true) {
+//         every { this@mockk.get(any()) } returns User(id = 1, name = "mock", age = 1)
+//     },
+//     holder = mockk<RepositoryHolder>(relaxed = true) {
+//         every { this@mockk.repository } returns mockk<KeyedRepository<User>>(relaxed = true) {
+//             every { this@mockk.get(any()) } returns User(id = 1, name = "mock", age = 1)
+//         }
+//     },
+//
+// GeneratedMockValueTest in src/test runs both, including the nested one - a stub bound to the wrong
+// receiver would still compile, so only running it shows which mock it landed on.
+
+interface KeyedRepository<T> {
+    fun get(key: String): T
+}
+
+interface RepositoryHolder {
+    val repository: KeyedRepository<User>
+}
+
+@Prev
+@Composable
+fun KeyedRepoCard(repository: KeyedRepository<User>) {
+    Text(text = repository.get("key").name)
+}
+
+@Prev
+@Composable
+fun NestedRepoCard(holder: RepositoryHolder) {
+    Text(text = holder.repository.get("key").name)
+}
