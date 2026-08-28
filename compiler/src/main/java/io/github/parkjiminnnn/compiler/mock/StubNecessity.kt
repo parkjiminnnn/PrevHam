@@ -45,7 +45,7 @@ internal class StubNecessity {
         // what it stands for - a `typealias Items = StateFlow<Item>` would not be recognised as a
         // Flow and the member would be left to relaxed mode (issue #81).
         val type = declaredType.resolveTypeAliases()
-        if (type.isErased()) return true
+        if (type.needsStubItself()) return true
         // Checked here as well as inside the search: a literal is the whole answer, and searching
         // into one finds the standard library's generic members and reports back a false positive.
         if (type.isLiteral()) return false
@@ -84,7 +84,19 @@ internal class StubNecessity {
             (declaration as? KSClassDeclaration)?.classKind == ClassKind.ENUM_CLASS
     }
 
-    /** A type relaxed mode can't produce a usable value for on its own. */
+    /**
+     * A type relaxed mode can't produce a usable value for, whatever it is asked.
+     *
+     * Two reasons, and neither depends on where the type came from. A type that erases reads back
+     * as a bare `Object` and the caller's checkcast rejects it. An `object` has exactly one
+     * instance and relaxed mode does not return it - MockK builds a fresh one through Objenesis, so
+     * `holder.state === Loading` is false and `when (holder.state) { Loading -> ... }` matches
+     * nothing. Stubbing an object costs nothing either way: the value is a reference, not another
+     * mock, so it adds no recursion (issue #77).
+     */
+    private fun KSType.needsStubItself(): Boolean = isErased() || (declaration as? KSClassDeclaration)?.classKind == ClassKind.OBJECT
+
+    /** A type whose own reference erases to `Object` when read back through a mock. */
     private fun KSType.isErased(): Boolean =
         declaration is KSTypeParameter ||
             declaration.qualifiedName?.asString() in KOTLINX_FLOW_QUALIFIED_NAMES
@@ -112,7 +124,7 @@ internal class StubNecessity {
                     declaration.getAllFunctions().filter { it.isStubbable() }.mapNotNull { it.returnType?.resolve()?.resolveTypeAliases() }
 
             for (memberType in memberTypes) {
-                if (memberType.isErased()) return true
+                if (memberType.needsStubItself()) return true
                 if (memberType.isLiteral()) continue
                 val memberDeclaration = memberType.declaration as? KSClassDeclaration ?: continue
                 if (!memberDeclaration.isFromSource()) continue

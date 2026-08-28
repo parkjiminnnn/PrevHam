@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -103,5 +104,27 @@ class GeneratedMockValueTest {
         val user = holder.repository.get("key")
 
         assertEquals("mock", user.name)
+    }
+
+    @Test
+    fun `a stubbed object member yields the singleton, not a copy`() {
+        // Copied from HolderCardPreview.kt. An object has exactly one instance, and identity is how
+        // it is used - `===` and a when branch both compare by reference (issue #77).
+        val holder =
+            mockk<LoadingHolder>(relaxed = true) {
+                every { this@mockk.state } returns ScreenUiState.Loading
+            }
+
+        assertSame(ScreenUiState.Loading, holder.state)
+    }
+
+    @Test
+    fun `relaxed mode alone hands back a copy of an object, not the singleton`() {
+        // What PrevHam generated before the stub existed. MockK builds a fresh instance through
+        // Objenesis, so nothing that compares by reference works against it. Kept executable so the
+        // gap can't reopen silently.
+        val holder = mockk<LoadingHolder>(relaxed = true)
+
+        assertNotSame(ScreenUiState.Loading, holder.state)
     }
 }

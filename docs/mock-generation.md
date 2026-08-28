@@ -47,6 +47,11 @@ real design constraint, not cosmetic:
 
 - **Generators that terminate immediately come first.** `Primitive`, `String`, and `Enum` never call
   back into the registry, so checking them first keeps the common case cheap.
+- **`Object` must precede `DataClass`.** A `data object` carries `Modifier.DATA` too, and it has a
+  synthesised zero-parameter constructor — so `DataClassMockGenerator`'s "every constructor parameter
+  can be mocked" was vacuously true and it emitted `Loading()`, which doesn't compile. Ordering fixes
+  it; `DataClassMockGenerator` also checks `classKind == CLASS`, so reordering the registry can't
+  bring it back (issue #77).
 - **`SealedType` must precede `Interface`.** A sealed interface is still an interface, and a sealed
   class is still a non-data class, so `InterfaceMockGenerator` would claim both and hand them to
   MockK — exactly what `SealedTypeMockGenerator` exists to avoid.
@@ -242,6 +247,11 @@ Only the ones relaxed mode can't answer. A concrete return type survives erasure
 produces a usable value for it — `titleFor(state): String` above needs nothing. What it can't answer
 is a type that erases away: a **type parameter** becomes `Object`, and so does whatever is read out
 of a **`Flow`** (`StateFlow<T>.value`).
+
+An `object`-typed member is stubbed for a different reason: relaxed mode *can* produce a value, but
+not the right one. MockK builds a fresh instance through Objenesis, so the singleton's identity is
+gone — `holder.state === Loading` is false and `when (holder.state) { Loading -> … }` matches
+nothing. The stub is a plain reference, so unlike the cases above it adds no recursion at all.
 
 Stubbing every member instead of only those was the original implementation, and it made each member
 a branch: the mock for a member is another mock, whose members are stubbed in turn, so output grew as
