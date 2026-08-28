@@ -55,10 +55,15 @@ internal class InterfaceMockGenerator : MockGenerator {
         val mockCall = CodeBlock.of("%M<%T>(relaxed = true)", MOCKK_FUNCTION, type.toTypeName())
         val stubs = declaration.memberStubs(type, context)
         if (stubs.isEmpty()) return mockCall
-
-        // mockk()'s trailing lambda is applied to the new mock, so the stubs read as
-        // `every { property } returns ...`: inside every {}, the innermost receiver is MockK's
-        // matcher scope, and the member resolves against the mock as the enclosing receiver.
+        // mockk()'s trailing lambda is applied to the new mock, so the stubs sit inside it. Each
+        // one names its receiver - `every { this@mockk.property } returns ...` - because inside
+        // every {} the receivers nest, with MockK's matcher scope innermost and the mock outside
+        // it, and an unqualified name resolves against the matcher scope first. Members called
+        // get, invoke, less or hint lose that way and the generated code doesn't compile (issue
+        // #83). Whether a name collides depends on its arity and parameter types as well, so the
+        // receiver is named rather than a list of names avoided. `this@mockk` labels the lambda
+        // passed to mockk(), whose receiver is declared T.() -> Unit, so it is the mock itself -
+        // and in a nested mock it binds to the nearest enclosing one.
         return CodeBlock
             .builder()
             .add("%L {\n", mockCall)
@@ -90,7 +95,7 @@ internal class InterfaceMockGenerator : MockGenerator {
                 val value =
                     context.stubValue(property.asMemberOf(containing.makeNotNullable()))
                         ?: return@mapNotNull null
-                CodeBlock.of("%M { %L } returns %L\n", EVERY_FUNCTION, property.simpleName.asString(), value)
+                CodeBlock.of("%M { this@mockk.%L } returns %L\n", EVERY_FUNCTION, property.simpleName.asString(), value)
             }.toList()
 
     private fun KSClassDeclaration.functionStubs(
@@ -110,7 +115,7 @@ internal class InterfaceMockGenerator : MockGenerator {
                 val matchers = function.parameters.joinToString { "any()" }
                 val every = if (Modifier.SUSPEND in function.modifiers) CO_EVERY_FUNCTION else EVERY_FUNCTION
                 CodeBlock.of(
-                    "%M { %L(%L) } returns %L\n",
+                    "%M { this@mockk.%L(%L) } returns %L\n",
                     every,
                     function.simpleName.asString(),
                     matchers,
@@ -120,7 +125,10 @@ internal class InterfaceMockGenerator : MockGenerator {
 
     // The value to stub a member with, or null to leave that member to relaxed mode - either
     // because there is nothing worth stubbing (Unit) or because no generator can build its type.
-    private fun MockContext.stubValue(type: KSType): CodeBlock? {
+    private fun MockContext.stubValue(declaredType: KSType): CodeBlock? {
+        // Resolved before the Flow check: an alias for a Flow has to take the real-flow branch
+        // below rather than being mocked like any other type (issue #81).
+        val type = declaredType.resolveTypeAliases()
         val qualifiedName = type.declaration.qualifiedName?.asString()
         if (qualifiedName == KOTLIN_UNIT_QUALIFIED_NAME) return null
         if (qualifiedName !in KOTLINX_FLOW_QUALIFIED_NAMES) {

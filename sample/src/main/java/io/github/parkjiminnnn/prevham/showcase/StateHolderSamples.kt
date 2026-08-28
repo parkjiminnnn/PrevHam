@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 // The generated argument for the parameter below:
 //
 //     mockk<ScreenViewModel>(relaxed = true) {
-//         every { uiState } returns MutableStateFlow(ScreenUiState.Loading)
+//         every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
 //     }
 //
 // Only `uiState` is stubbed. `titleFor` returns a String, which relaxed mode answers on its own -

@@ -1,5 +1,6 @@
 package io.github.parkjiminnnn.compiler.mock
 
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
@@ -32,6 +33,11 @@ internal class DataClassMockGenerator : MockGenerator {
     // data class this is a no-op and returns the declared types unchanged.
     private fun KSType.substitutedConstructorParameters(): List<MockParameter>? {
         val declaration = declaration as? KSClassDeclaration ?: return null
+        // A `data object` carries Modifier.DATA as well, and its synthesised zero-parameter
+        // constructor makes the check below vacuously true - emitting `Loading()`, which does not
+        // compile. ObjectMockGenerator is registered first so this is unreachable, but the kind is
+        // checked here too: reordering the registry should not be able to bring that back.
+        if (declaration.classKind != ClassKind.CLASS) return null
         if (Modifier.DATA !in declaration.modifiers) return null
         val constructor = declaration.primaryConstructor ?: return null
         // asMemberOf() rejects a nullable containing type outright ("Item? is not a sub type of

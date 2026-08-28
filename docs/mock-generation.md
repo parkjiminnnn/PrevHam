@@ -47,6 +47,11 @@ real design constraint, not cosmetic:
 
 - **Generators that terminate immediately come first.** `Primitive`, `String`, and `Enum` never call
   back into the registry, so checking them first keeps the common case cheap.
+- **`Object` must precede `DataClass`.** A `data object` carries `Modifier.DATA` too, and it has a
+  synthesised zero-parameter constructor — so `DataClassMockGenerator`'s "every constructor parameter
+  can be mocked" was vacuously true and it emitted `Loading()`, which doesn't compile. Ordering fixes
+  it; `DataClassMockGenerator` also checks `classKind == CLASS`, so reordering the registry can't
+  bring it back (issue #77).
 - **`SealedType` must precede `Interface`.** A sealed interface is still an interface, and a sealed
   class is still a non-data class, so `InterfaceMockGenerator` would claim both and hand them to
   MockK — exactly what `SealedTypeMockGenerator` exists to avoid.
@@ -131,6 +136,35 @@ constructed in ordinary code either, but the declaration is legal and must not h
 `MAX_PATH_LENGTH` caps the path at 64. That is a safety net for pathological declarations, not a
 supported nesting limit — real models are nowhere near it.
 
+
+## Type aliases: resolved before dispatch
+
+A `typealias` is a second name for a type rather than a type of its own, but KSP reports it as a
+`KSTypeAlias` declaration. Every generator narrows with `type.declaration as? KSClassDeclaration`,
+so an aliased type matched nothing and the whole Preview was skipped — issue #81. This was never
+limited to aliases a user writes: `kotlin.Comparator` is an alias for `java.util.Comparator`, so the
+same parameter was supported or not depending on which name it was spelled with.
+
+`MockContext.canMock` and `mock` resolve the alias before consulting the registry, so the generators
+only ever see real class declarations. Resolving there rather than in each generator also keeps the
+path key honest — cycle detection compares expanded types, so `Node` and an alias for it are one
+type on the path rather than two.
+
+Three other places read a declared type without going through the context, and resolve for the same
+reason: `StubNecessity.isNeededFor` and its search, which would otherwise not recognise
+`typealias Items = StateFlow<Item>` as a Flow, and `InterfaceMockGenerator.stubValue`, which chooses
+between a real `MutableStateFlow` and a mock by qualified name.
+
+Nullability comes from the use site, not the alias: `MyItem?` stays nullable after expanding to
+`Item`.
+
+An alias that declares its own type parameters has the use site's arguments applied to them —
+`typealias PagedList<T> = List<T>` used as `PagedList<User>` becomes `List<User>`, not `List<T>`.
+`KSType.replace` is positional, so this is exact only when the right-hand side applies the alias's
+parameters in declaration order. `typealias Swapped<A, B> = Pair<B, A>` and
+`typealias Nested<T> = Box<Box<T>>` are deliberately not resolved: substituting positionally would
+produce code that compiles and mocks the wrong types, so they stay unsupported instead, which is
+what every alias did before.
 ## `MockParameter`: decoupling "what to mock" from "how its type was found"
 
 ```kotlin
@@ -200,7 +234,7 @@ that, up front, using `mockk()`'s own trailing-lambda DSL:
 
 ```kotlin
 mockk<ScreenStateHolder>(relaxed = true) {
-    every { uiState } returns MutableStateFlow(ScreenUiState.Loading)
+    every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
 }
 ```
 
@@ -213,6 +247,11 @@ Only the ones relaxed mode can't answer. A concrete return type survives erasure
 produces a usable value for it — `titleFor(state): String` above needs nothing. What it can't answer
 is a type that erases away: a **type parameter** becomes `Object`, and so does whatever is read out
 of a **`Flow`** (`StateFlow<T>.value`).
+
+An `object`-typed member is stubbed for a different reason: relaxed mode *can* produce a value, but
+not the right one. MockK builds a fresh instance through Objenesis, so the singleton's identity is
+gone — `holder.state === Loading` is false and `when (holder.state) { Loading -> … }` matches
+nothing. The stub is a plain reference, so unlike the cases above it adds no recursion at all.
 
 Stubbing every member instead of only those was the original implementation, and it made each member
 a branch: the mock for a member is another mock, whose members are stubbed in turn, so output grew as
@@ -237,9 +276,9 @@ Two boundaries keep that search honest, both learned by measuring:
   couple of hops later `Iterator<T>.next()` reports "erased", which would mark practically every type
   as needing a stub.
 - **It stops at compiled dependencies.** `Throwable` reaches an erased member through
-  `Array<StackTraceElement>.get`, and stubbing that far in emits `every { get(any()) }`, which
-  collides with MockK's matcher scope and doesn't compile. The cost is that an erased member behind a
-  library type isn't found; `Flow` is unaffected, being recognised directly rather than by searching.
+  `Array<StackTraceElement>.get`, and following that marks practically every type as needing a stub —
+  the state generation exploded from in issue #75. The cost is that an erased member behind a library
+  type isn't found; `Flow` is unaffected, being recognised directly rather than by searching.
 
 Narrowing makes the blow-up rare rather than impossible — a graph whose every branch leads to
 something erased still expands along all of them — so `MockContext.MAX_STUBS` caps the total for one
@@ -252,9 +291,9 @@ side effects.
 
 | Member shape | Emitted |
 |---|---|
-| Property | `every { name } returns <mock>` |
+| Property | `every { this@mockk.name } returns <mock>` |
 | Property or function returning `Flow`/`SharedFlow`/`StateFlow`/`Mutable*` | `... returns MutableStateFlow(<mock of the element type>)` |
-| Function | `every { name(any(), any()) } returns <mock>` — one matcher per parameter |
+| Function | `every { this@mockk.name(any(), any()) } returns <mock>` — one matcher per parameter |
 | `suspend` function | the same, with `coEvery` |
 
 Beyond the narrowing above, a member is also skipped when it returns `Unit`, when no generator

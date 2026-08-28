@@ -59,7 +59,7 @@ class MockMemberStubbingTest {
             )
 
         assertTrue(generated, generated.contains("mockk<HomeScreenViewModel>(relaxed = true) {"))
-        assertTrue(generated, generated.contains("every { uiState } returns MutableStateFlow(UiState.Loading)"))
+        assertTrue(generated, generated.contains("every { this@mockk.uiState } returns MutableStateFlow(UiState.Loading)"))
     }
 
     @Test
@@ -100,8 +100,8 @@ class MockMemberStubbingTest {
             )
 
         // asMemberOf substitutes the type argument, so the stub gets String rather than T.
-        assertTrue(generated, generated.contains("""every { value } returns "mock""""))
-        assertTrue(generated, generated.contains("""every { get() } returns "mock""""))
+        assertTrue(generated, generated.contains("""every { this@mockk.value } returns "mock""""))
+        assertTrue(generated, generated.contains("""every { this@mockk.get() } returns "mock""""))
     }
 
     @Test
@@ -119,9 +119,9 @@ class MockMemberStubbingTest {
                 """,
             )
 
-        assertTrue(generated, generated.contains("every { middle } returns"))
-        assertTrue(generated, generated.contains("every { inner } returns"))
-        assertTrue(generated, generated.contains("every { items } returns MutableStateFlow(Item("))
+        assertTrue(generated, generated.contains("every { this@mockk.middle } returns"))
+        assertTrue(generated, generated.contains("every { this@mockk.inner } returns"))
+        assertTrue(generated, generated.contains("every { this@mockk.items } returns MutableStateFlow(Item("))
     }
 
     @Test
@@ -145,8 +145,10 @@ class MockMemberStubbingTest {
     @Test
     fun `does not search through a type from a compiled dependency`() {
         // Throwable reaches an erased member via Array<StackTraceElement>.get, so searching into it
-        // would mark it as needing stubs - and stubbing that far in emits `every { get(any()) }`,
-        // which collides with MockK's matcher scope and doesn't compile.
+        // would mark it as needing stubs - and practically every other type with it, which is the
+        // state that let generation explode in issue #75. The collision that stubbing that far in
+        // used to cause is gone since issue #83 named the receiver; the reason to stop here is the
+        // explosion, not the collision.
         val generated = generate("Error", "", parameter = "t: Throwable")
 
         assertTrue(generated, generated.contains("mockk<Throwable>(relaxed = true),"))
@@ -167,8 +169,8 @@ class MockMemberStubbingTest {
                 """,
             )
 
-        assertTrue(generated, generated.contains("every { findAll() } returns MutableStateFlow(Hit("))
-        assertTrue(generated, generated.contains("every { find(any(), any()) } returns MutableStateFlow(Hit("))
+        assertTrue(generated, generated.contains("every { this@mockk.findAll() } returns MutableStateFlow(Hit("))
+        assertTrue(generated, generated.contains("every { this@mockk.find(any(), any()) } returns MutableStateFlow(Hit("))
     }
 
     @Test
@@ -184,7 +186,7 @@ class MockMemberStubbingTest {
                 """,
             )
 
-        assertTrue(generated, generated.contains("coEvery { load(any()) } returns MutableStateFlow(Post("))
+        assertTrue(generated, generated.contains("coEvery { this@mockk.load(any()) } returns MutableStateFlow(Post("))
     }
 
     @Test
@@ -204,7 +206,7 @@ class MockMemberStubbingTest {
                 """,
             )
 
-        assertTrue(generated, generated.contains("every { visible } returns MutableStateFlow(Item("))
+        assertTrue(generated, generated.contains("every { this@mockk.visible } returns MutableStateFlow(Item("))
         assertFalse(generated, generated.contains("secret"))
         assertFalse(generated, generated.contains("shared"))
         assertFalse(generated, generated.contains("convert"))
@@ -227,7 +229,7 @@ class MockMemberStubbingTest {
                 parameter = "viewModel: OptionalViewModel?",
             )
 
-        assertTrue(generated, generated.contains("every { items } returns MutableStateFlow(Item("))
+        assertTrue(generated, generated.contains("every { this@mockk.items } returns MutableStateFlow(Item("))
     }
 
     @Test
@@ -288,5 +290,83 @@ class MockMemberStubbingTest {
 
         val mocks = generated.split("mockk<").size - 1
         assertTrue("$mocks mocks:\n$generated", mocks <= 2)
+    }
+
+    @Test
+    fun `stubs a member whose name also exists on MockK's matcher scope`() {
+        // Inside every { } the receivers nest - MockKMatcherScope innermost, the mock outside it -
+        // so an unqualified name resolves against MockK's first. get, invoke, less and hint all
+        // lose that way at this arity (issue #83). Whether a name collides depends on arity and
+        // parameter types as well, which is why the generated call names its receiver rather than
+        // avoiding a list of names.
+        //
+        // compilePrev compiling at all is the assertion here: this is a resolution error, so a test
+        // asserting on the generated text would pass while the output is broken.
+        val generated =
+            generate(
+                "Cache",
+                """
+                data class Item(val title: String)
+                interface CacheViewModel {
+                    fun get(key: String): StateFlow<Item>
+                    fun invoke(key: String): StateFlow<Item>
+                    fun less(key: String): StateFlow<Item>
+                    fun hint(key: String): StateFlow<Item>
+                }
+                """,
+            )
+
+        assertTrue(generated, generated.contains("every { this@mockk.get(any()) } returns"))
+        assertTrue(generated, generated.contains("every { this@mockk.invoke(any()) } returns"))
+    }
+
+    @Test
+    fun `qualifies a stubbed property as well as a function`() {
+        // val get is safe today, but getProperty and getLambda are property names on the matcher
+        // scope too. Qualifying both sites costs nothing and needs no table of exceptions.
+        val generated =
+            generate(
+                "Held",
+                """
+                data class Item(val title: String)
+                interface HeldViewModel { val items: StateFlow<Item> }
+                """,
+            )
+
+        assertTrue(generated, generated.contains("every { this@mockk.items } returns"))
+    }
+
+    @Test
+    fun `qualifies a suspend function stubbed with coEvery`() {
+        val generated =
+            generate(
+                "Loader",
+                """
+                data class Item(val title: String)
+                interface LoaderViewModel { suspend fun get(key: String): StateFlow<Item> }
+                """,
+            )
+
+        assertTrue(generated, generated.contains("coEvery { this@mockk.get(any()) } returns"))
+    }
+
+    @Test
+    fun `binds the qualifier to the nearest enclosing mock`() {
+        // A nested mock is a nested mockk lambda, so this@mockk has to resolve to the inner one.
+        // If it bound to the outer mock the inner stub would land on the wrong object, and the
+        // generated code would still compile - which is why this is asserted on structure and
+        // covered again at runtime in :sample.
+        val generated =
+            generate(
+                "Nested",
+                """
+                data class Item(val title: String)
+                interface Inner { val items: StateFlow<Item> }
+                interface NestedViewModel { val inner: Inner }
+                """,
+            )
+
+        assertTrue(generated, generated.contains("every { this@mockk.inner } returns"))
+        assertTrue(generated, generated.contains("every { this@mockk.items } returns"))
     }
 }

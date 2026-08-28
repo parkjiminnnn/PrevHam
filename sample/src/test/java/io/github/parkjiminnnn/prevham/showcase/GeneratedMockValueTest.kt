@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -22,7 +23,7 @@ class GeneratedMockValueTest {
     fun `a stubbed StateFlow member yields the real state, not a mock`() {
         val viewModel =
             mockk<ScreenViewModel>(relaxed = true) {
-                every { uiState } returns MutableStateFlow(ScreenUiState.Loading)
+                every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
             }
 
         val state = viewModel.uiState.value
@@ -70,4 +71,60 @@ class GeneratedMockValueTest {
             is ScreenUiState.Success -> "success"
             is ScreenUiState.Error -> "error"
         }
+
+    @Test
+    fun `a stub on a member named like MockK's own applies to the mock`() {
+        // Copied from KeyedRepoCardPreview.kt. MockKMatcherScope declares a get of its own and is
+        // the innermost receiver inside every { }, so without naming the receiver this doesn't
+        // compile at all (issue #83).
+        val repository =
+            mockk<KeyedRepository<User>>(relaxed = true) {
+                every { this@mockk.get(any()) } returns User(id = 1, name = "mock", age = 1)
+            }
+
+        val user = repository.get("key")
+
+        assertEquals("mock", user.name)
+        assertEquals(1, user.id)
+    }
+
+    @Test
+    fun `a nested stub binds to the inner mock, not the outer one`() {
+        // Copied from NestedRepoCardPreview.kt. Both stubs are written this@mockk, and the inner
+        // one has to resolve to the inner mockk lambda. Bound to the outer mock it would still
+        // compile and still be a valid program, so only running it shows where the stub landed.
+        val holder =
+            mockk<RepositoryHolder>(relaxed = true) {
+                every { this@mockk.repository } returns
+                    mockk<KeyedRepository<User>>(relaxed = true) {
+                        every { this@mockk.get(any()) } returns User(id = 1, name = "mock", age = 1)
+                    }
+            }
+
+        val user = holder.repository.get("key")
+
+        assertEquals("mock", user.name)
+    }
+
+    @Test
+    fun `a stubbed object member yields the singleton, not a copy`() {
+        // Copied from HolderCardPreview.kt. An object has exactly one instance, and identity is how
+        // it is used - `===` and a when branch both compare by reference (issue #77).
+        val holder =
+            mockk<LoadingHolder>(relaxed = true) {
+                every { this@mockk.state } returns ScreenUiState.Loading
+            }
+
+        assertSame(ScreenUiState.Loading, holder.state)
+    }
+
+    @Test
+    fun `relaxed mode alone hands back a copy of an object, not the singleton`() {
+        // What PrevHam generated before the stub existed. MockK builds a fresh instance through
+        // Objenesis, so nothing that compares by reference works against it. Kept executable so the
+        // gap can't reopen silently.
+        val holder = mockk<LoadingHolder>(relaxed = true)
+
+        assertNotSame(ScreenUiState.Loading, holder.state)
+    }
 }
