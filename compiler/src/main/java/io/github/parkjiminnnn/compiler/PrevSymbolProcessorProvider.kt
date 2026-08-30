@@ -4,6 +4,8 @@ import com.google.auto.service.AutoService
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
+import io.github.parkjiminnnn.compiler.mock.MockValues
+import java.io.File
 
 /**
  * Entry point KSP uses to create PrevHam's symbol processor.
@@ -27,5 +29,32 @@ class PrevSymbolProcessorProvider : SymbolProcessorProvider {
         PrevSymbolProcessor(
             codeGenerator = environment.codeGenerator,
             logger = environment.logger,
+            mockValues = environment.mockValues(),
         )
+
+    /**
+     * The configured mock values, or none.
+     *
+     * The path arrives as a KSP option:
+     *
+     * ```kotlin
+     * ksp { arg("prevham.mockValues", "$projectDir/src/main/prevham/mock-values.json") }
+     * ```
+     *
+     * A configured file that can't be read is a warning, never an error - the Previews it would
+     * have improved still generate with their default values. Silence would be worse: a typo in the
+     * path would look like the values simply having no effect.
+     */
+    private fun SymbolProcessorEnvironment.mockValues(): MockValues {
+        val path = options[MOCK_VALUES_OPTION] ?: return MockValues.EMPTY
+        return MockValues
+            .from(File(path))
+            .onFailure { failure ->
+                logger.warn("[PrevHam] could not read mock values from '$path': ${failure.message}")
+            }.getOrDefault(MockValues.EMPTY)
+    }
+
+    private companion object {
+        const val MOCK_VALUES_OPTION = "prevham.mockValues"
+    }
 }
