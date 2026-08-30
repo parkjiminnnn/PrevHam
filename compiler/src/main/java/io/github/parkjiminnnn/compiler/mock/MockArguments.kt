@@ -11,10 +11,8 @@ internal data class MockParameter(
     val name: String,
     val type: KSType,
     val hasDefault: Boolean,
-    // Where this value is declared, e.g. com.example.Festival.festivalName - null when the owner
-    // has no qualified name to build one from. Type alone can't choose a value, since
-    // Festival.name and User.name are both String and want different answers.
-    val slot: String? = null,
+    // Where this value is declared - null when the owner has no qualified name to build one from.
+    val slot: MockSlot? = null,
 )
 
 internal fun KSValueParameter.toMockParameter(
@@ -22,7 +20,15 @@ internal fun KSValueParameter.toMockParameter(
     owner: String? = null,
 ): MockParameter? {
     val name = name?.asString() ?: return null
-    return MockParameter(name, type, hasDefault, slot = owner?.let { "$it.$name" })
+    // Resolved, not declared: a `typealias UserName = String` slot takes a String, and a consumer
+    // of the manifest reading "UserName" has no way to learn that.
+    val typeName =
+        type
+            .resolveTypeAliases()
+            .declaration.qualifiedName
+            ?.asString()
+    val slot = if (owner != null && typeName != null) MockSlot(owner, name, typeName) else null
+    return MockParameter(name, type, hasDefault, slot)
 }
 
 // Shared by the processor, for a @Prev function's own parameters, and by DataClassMockGenerator,

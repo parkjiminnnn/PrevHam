@@ -14,7 +14,10 @@ internal class StringMockGenerator : MockGenerator {
     override fun generate(
         type: KSType,
         context: MockContext,
-    ): CodeBlock = CodeBlock.of("%S", context.slotValue() ?: "mock")
+    ): CodeBlock {
+        context.recordSlot()
+        return CodeBlock.of("%S", context.slotValue() ?: "mock")
+    }
 
     private companion object {
         const val STRING_QUALIFIED_NAME = "kotlin.String"
