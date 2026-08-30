@@ -30,6 +30,7 @@ class PrevSymbolProcessorProvider : SymbolProcessorProvider {
             codeGenerator = environment.codeGenerator,
             logger = environment.logger,
             mockValues = environment.mockValues(),
+            slotManifest = environment.options[SLOT_MANIFEST_OPTION]?.let(::File),
         )
 
     /**
@@ -56,5 +57,9 @@ class PrevSymbolProcessorProvider : SymbolProcessorProvider {
 
     private companion object {
         const val MOCK_VALUES_OPTION = "prevham.mockValues"
+
+        // Opt-in: without it nothing is written, so a build that has no use for a manifest is not
+        // surprised by a new file appearing.
+        const val SLOT_MANIFEST_OPTION = "prevham.slotManifest"
     }
 }

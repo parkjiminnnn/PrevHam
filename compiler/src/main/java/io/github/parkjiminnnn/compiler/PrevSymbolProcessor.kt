@@ -15,16 +15,24 @@ import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
 import io.github.parkjiminnnn.compiler.mock.MockContext
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
 import io.github.parkjiminnnn.compiler.mock.MockValues
+import io.github.parkjiminnnn.compiler.mock.SlotManifest
+import io.github.parkjiminnnn.compiler.mock.SlotRecorder
 import io.github.parkjiminnnn.compiler.mock.buildMockArguments
 import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
 import io.github.parkjiminnnn.compiler.mock.toMockParameter
+import java.io.File
 
 internal class PrevSymbolProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
     private val mockValues: MockValues = MockValues.EMPTY,
+    private val slotManifest: File? = null,
 ) : SymbolProcessor {
     private val mockGenerators = MockGeneratorRegistry.default()
+
+    // One recorder for the whole compilation, not one per function: KSP calls process() once per
+    // round, and the manifest describes everything the compilation met.
+    private val slots = SlotRecorder()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation(PREV_ANNOTATION_NAME).toList()
@@ -33,6 +41,22 @@ internal class PrevSymbolProcessor(
         symbols.filterIsInstance<KSFunctionDeclaration>().forEach(::processFunction)
 
         return emptyList()
+    }
+
+    /**
+     * Writes the slot manifest, once every round has run.
+     *
+     * In finish() rather than process() because a slot found in a later round still belongs in the
+     * manifest, and a file rewritten per round would be incomplete until the last one.
+     */
+    override fun finish() {
+        val file = slotManifest ?: return
+        runCatching { SlotManifest.write(file, slots.recorded()) }
+            .onFailure { failure ->
+                // A manifest is a convenience for the generation task; failing to write one must
+                // not fail a compilation that has otherwise produced every Preview it was asked for.
+                logger.warn("[PrevHam] could not write the slot manifest to '$file': ${failure.message}")
+            }
     }
 
     private fun processFunction(function: KSFunctionDeclaration) {
@@ -70,7 +94,7 @@ internal class PrevSymbolProcessor(
 
     private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
         val parameters = function.parameters.mapNotNull { it.toMockParameter(owner = function.qualifiedName?.asString()) }
-        val context = MockContext.root(mockGenerators, mockValues)
+        val context = MockContext.root(mockGenerators, mockValues, slots)
         val unsupported = firstUnsupportedParameter(parameters, context)
         if (unsupported != null) {
             logger.warn(
