@@ -16,6 +16,7 @@ ksp = "2.2.10-2.0.2"
 autoService = "1.1.1"
 autoServiceKsp = "1.2.0"
 kotlinpoet = "1.18.1"
+kotlinxSerializationJson = "1.7.3"
 mockk = "1.13.13"
 kotlinCompileTesting = "0.11.1"
 mavenPublish = "0.33.0"
@@ -49,6 +50,7 @@ ksp-symbol-processing-api = { group = "com.google.devtools.ksp", name = "symbol-
 autoservice-annotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "autoService" }
 autoservice-ksp = { group = "dev.zacsweers.autoservice", name = "auto-service-ksp", version.ref = "autoServiceKsp" }
 kotlinpoet = { group = "com.squareup", name = "kotlinpoet", version.ref = "kotlinpoet" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 kotlin-compile-testing-core = { group = "dev.zacsweers.kctfork", name = "core", version.ref = "kotlinCompileTesting" }
 kotlin-compile-testing-ksp = { group = "dev.zacsweers.kctfork", name = "ksp", version.ref = "kotlinCompileTesting" }

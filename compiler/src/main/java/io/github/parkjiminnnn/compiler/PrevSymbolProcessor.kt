@@ -14,6 +14,7 @@ import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
 import io.github.parkjiminnnn.compiler.mock.MockContext
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
+import io.github.parkjiminnnn.compiler.mock.MockValues
 import io.github.parkjiminnnn.compiler.mock.buildMockArguments
 import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
 import io.github.parkjiminnnn.compiler.mock.toMockParameter
@@ -21,6 +22,7 @@ import io.github.parkjiminnnn.compiler.mock.toMockParameter
 internal class PrevSymbolProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
+    private val mockValues: MockValues = MockValues.EMPTY,
 ) : SymbolProcessor {
     private val mockGenerators = MockGeneratorRegistry.default()
 
@@ -67,8 +69,8 @@ internal class PrevSymbolProcessor(
     }
 
     private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
-        val parameters = function.parameters.mapNotNull { it.toMockParameter() }
-        val context = MockContext.root(mockGenerators)
+        val parameters = function.parameters.mapNotNull { it.toMockParameter(owner = function.qualifiedName?.asString()) }
+        val context = MockContext.root(mockGenerators, mockValues)
         val unsupported = firstUnsupportedParameter(parameters, context)
         if (unsupported != null) {
             logger.warn(

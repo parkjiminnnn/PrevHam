@@ -47,8 +47,9 @@ internal class DataClassMockGenerator : MockGenerator {
         // so ask about the non-null form.
         val substitutedTypes = constructor.asMemberOf(makeNotNullable()).parameterTypes
         if (substitutedTypes.size != constructor.parameters.size) return null
+        val owner = declaration.qualifiedName?.asString()
         return constructor.parameters.zip(substitutedTypes).map { (parameter, type) ->
-            parameter.toMockParameter(type ?: return null) ?: return null
+            parameter.toMockParameter(type ?: return null, owner) ?: return null
         }
     }
 }
