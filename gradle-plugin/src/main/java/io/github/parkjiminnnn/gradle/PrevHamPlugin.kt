@@ -32,6 +32,15 @@ import org.gradle.api.Project
  */
 class PrevHamPlugin : Plugin<Project> {
     override fun apply(target: Project) {
+        val extension = target.extensions.create(EXTENSION_NAME, PrevHamExtension::class.java)
+        extension.mockValues.convention(target.layout.projectDirectory.file(DEFAULT_MOCK_VALUES))
+        extension.slotManifest.convention(target.layout.buildDirectory.file(DEFAULT_SLOT_MANIFEST))
+
+        target.tasks.register(GENERATE_TASK_NAME, GenerateMockValuesTask::class.java) { task ->
+            task.slotManifest.set(extension.slotManifest)
+            task.mockValues.set(extension.mockValues)
+        }
+
         // The `implementation` and `ksp` configurations come from the Kotlin and KSP plugins, so
         // reacting to Kotlin being applied avoids depending on the order of the `plugins {}` block.
         // Both Kotlin plugin ids are covered: an Android consumer applies one, a plain JVM module
@@ -44,6 +53,9 @@ class PrevHamPlugin : Plugin<Project> {
         // should be told about the one it needs first, and a Kotlin Multiplatform project (which
         // satisfies KSP but none of the ids above) should hear that rather than "KSP is missing".
         target.afterEvaluate { project ->
+            // In afterEvaluate so a consumer's own `prevham { }` block has run first. KspExtension.arg
+            // takes plain strings rather than providers, so the value has to be final when it is set.
+            project.pluginManager.withPlugin(KSP_PLUGIN_ID) { KspOptions.set(project, extension) }
             check(KOTLIN_PLUGIN_IDS.any { project.pluginManager.hasPlugin(it) }) { MISSING_KOTLIN_MESSAGE }
             check(project.pluginManager.hasPlugin(KSP_PLUGIN_ID)) { MISSING_KSP_MESSAGE }
         }
@@ -64,6 +76,10 @@ class PrevHamPlugin : Plugin<Project> {
 
     private companion object {
         const val KSP_PLUGIN_ID = "com.google.devtools.ksp"
+        const val EXTENSION_NAME = "prevham"
+        const val GENERATE_TASK_NAME = "prevhamGenerateMockValues"
+        const val DEFAULT_MOCK_VALUES = "src/main/prevham/mock-values.json"
+        const val DEFAULT_SLOT_MANIFEST = "generated/prevham/mock-value-slots.json"
         val KOTLIN_PLUGIN_IDS =
             listOf(
                 "org.jetbrains.kotlin.android",
