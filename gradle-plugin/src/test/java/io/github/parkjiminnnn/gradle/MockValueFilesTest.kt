@@ -1,6 +1,7 @@
 package io.github.parkjiminnnn.gradle
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -99,5 +100,39 @@ class MockValueFilesTest {
         val slots = listOf(slot("com.a.A.x"), slot("com.a.B.y"))
 
         assertEquals(mapOf("com.a.A.x" to "", "com.a.B.y" to ""), PlaceholderMockValueSource.valuesFor(slots))
+    }
+
+    @Test
+    fun `writes non-ascii as itself, not as escapes`() {
+        // This file exists to be opened and edited by hand, and "제 1회 …" is a value nobody
+        // will correct. JSON is UTF-8; the characters need no escaping.
+        val target = File(folder.root, "values.json")
+
+        MockValueFiles.writeValues(target, mapOf("com.a.Festival.name" to "제 1회 대학 음악제"))
+
+        val written = target.readText()
+        assertTrue(written, written.contains("제 1회 대학 음악제"))
+        assertFalse(written, written.contains("\\u"))
+    }
+
+    @Test
+    fun `escapes what JSON actually requires`() {
+        val target = File(folder.root, "values.json")
+        val awkward = "he said \"hi\"\\\n\ttab"
+
+        MockValueFiles.writeValues(target, mapOf("com.a.A.x" to awkward))
+
+        // Round-tripping is the assertion: whatever the escaping looks like, reading it back has to
+        // produce what went in.
+        assertEquals(mapOf("com.a.A.x" to awkward), MockValueFiles.readValues(target))
+    }
+
+    @Test
+    fun `writes an empty file as an empty object`() {
+        val target = File(folder.root, "values.json")
+
+        MockValueFiles.writeValues(target, emptyMap())
+
+        assertEquals(emptyMap<String, String>(), MockValueFiles.readValues(target))
     }
 }

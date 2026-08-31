@@ -164,4 +164,19 @@ class SlotManifestTest {
         assertTrue(manifest, manifest.contains(""""type": "kotlin.String""""))
         assertFalse(manifest, manifest.contains("UserName"))
     }
+
+    @Test
+    fun `lists numeric slots but not boolean or char`() {
+        val manifest =
+            manifestFor(
+                "Mixed",
+                "data class Mixed(val visitors: Int, val budget: Long, val on: Boolean, val initial: Char)",
+                "mixed: Mixed",
+            )
+
+        assertTrue(manifest, manifest.contains(""""type": "kotlin.Int""""))
+        assertTrue(manifest, manifest.contains(""""type": "kotlin.Long""""))
+        assertFalse(manifest, manifest.contains("kotlin.Boolean"))
+        assertFalse(manifest, manifest.contains("kotlin.Char"))
+    }
 }

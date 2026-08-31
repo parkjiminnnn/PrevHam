@@ -37,6 +37,28 @@ abstract class GenerateMockValuesTask : DefaultTask() {
     @get:Option(option = "force", description = "Replace values that have already been decided.")
     abstract val force: Property<Boolean>
 
+    @get:Input
+    @get:Optional
+    abstract val baseUrl: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val model: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val language: Property<String>
+
+    // @Internal, not @Input: an input is hashed and can be recorded in build scans and caches, and
+    // a credential has no business in either.
+    @get:Internal
+    abstract val apiKey: Property<String>
+
+    // Set when the key was found somewhere that is normally committed. Carried as a message rather
+    // than a flag so the task can say which file and what to do instead.
+    @get:Internal
+    abstract val rejectedApiKeyLocation: Property<String>
+
     init {
         group = "prevham"
         description = "Fills in mock values for the slots that have none."
@@ -47,6 +69,8 @@ abstract class GenerateMockValuesTask : DefaultTask() {
 
     @TaskAction
     fun generate() {
+        rejectedApiKeyLocation.orNull?.let { error(it) }
+
         val manifest = slotManifest.get().asFile
         val slots = MockValueFiles.readSlots(manifest)
         if (slots.isEmpty()) {
@@ -67,10 +91,39 @@ abstract class GenerateMockValuesTask : DefaultTask() {
         }
 
         val generated = source().valuesFor(undecided)
-        MockValueFiles.writeValues(valuesFile, existing.mergedWith(generated))
-        logger.lifecycle("[PrevHam] wrote ${generated.size} value(s) to '$valuesFile'")
+        val merged = existing.mergedWith(generated)
+        MockValueFiles.writeValues(valuesFile, merged)
+        // Both counts, because they answer different questions: how many came back this run, and
+        // what the file holds now. Reporting only the first reads as "nothing was written" when a
+        // run produces nothing, which is wrong - what was already decided is still there.
+        logger.lifecycle(
+            "[PrevHam] ${generated.size} new value(s); ${merged.size} in '$valuesFile'",
+        )
     }
 
-    // The one place that changes when a real source arrives; everything either side of it stays.
-    private fun source(): MockValueSource = PlaceholderMockValueSource
+    /**
+     * Where values come from: an endpoint when one is configured, otherwise the scaffold.
+     *
+     * Falling back rather than failing is deliberate. Scaffolding the paths is useful on its own -
+     * they are the part nobody can reasonably produce by hand - and someone who wants to write the
+     * values themselves should not have to name a model to do it.
+     */
+    private fun source(): MockValueSource {
+        val url = baseUrl.orNull
+        val model = model.orNull
+        if (url.isNullOrBlank() || model.isNullOrBlank()) {
+            logger.lifecycle(
+                "[PrevHam] no baseUrl/model configured - writing the slot paths with empty values. " +
+                    "Set them in the prevham { } block to have them filled in.",
+            )
+            return PlaceholderMockValueSource
+        }
+        return OpenAiCompatibleMockValueSource(
+            baseUrl = url,
+            model = model,
+            apiKey = apiKey.orNull,
+            language = language.getOrElse("en"),
+            logger = logger,
+        )
+    }
 }

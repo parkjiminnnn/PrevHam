@@ -162,4 +162,69 @@ class MockValueInjectionTest {
         val generated = requireNotNull(result.generatedFile("MissingPreview.kt"))
         assertTrue(generated, generated.contains("""title = "mock""""))
     }
+
+    @Test
+    fun `uses the configured value for a numeric field`() {
+        val generated =
+            generate(
+                "Counts",
+                "data class Counts(val visitors: Int, val budget: Long, val rating: Double)",
+                "counts: Counts",
+                values =
+                    """
+                    {"test.Counts.visitors": "12000", "test.Counts.budget": "45000000",
+                     "test.Counts.rating": "4.7"}
+                    """,
+            )
+
+        assertTrue(generated, generated.contains("visitors = 12000"))
+        assertTrue(generated, generated.contains("budget = 45000000L"))
+        assertTrue(generated, generated.contains("rating = 4.7"))
+    }
+
+    @Test
+    fun `falls back when a numeric value is not a number`() {
+        // A value file is hand-editable and a generated one is a model's guess, so "about 400" has
+        // to become the default rather than source that doesn't compile. Compiling is the assertion.
+        val generated =
+            generate(
+                "Loose",
+                "data class Loose(val visitors: Int, val budget: Long)",
+                "loose: Loose",
+                values = """{"test.Loose.visitors": "about 400", "test.Loose.budget": "45,000"}""",
+            )
+
+        assertTrue(generated, generated.contains("visitors = 1"))
+        assertTrue(generated, generated.contains("budget = 1L"))
+    }
+
+    @Test
+    fun `falls back when a numeric value does not fit its type`() {
+        val generated =
+            generate(
+                "TooBig",
+                "data class TooBig(val small: Byte, val ratio: Double)",
+                "value: TooBig",
+                values = """{"test.TooBig.small": "9999", "test.TooBig.ratio": "1e400"}""",
+            )
+
+        assertTrue(generated, generated.contains("small = 1"))
+        assertTrue(generated, generated.contains("ratio = 1.0"))
+    }
+
+    @Test
+    fun `leaves boolean and char alone`() {
+        // true is already as good an answer as false, and a single character carries no meaning
+        // worth generating - so neither takes a configured value.
+        val generated =
+            generate(
+                "Flags",
+                "data class Flags(val enabled: Boolean, val initial: Char)",
+                "flags: Flags",
+                values = """{"test.Flags.enabled": "false", "test.Flags.initial": "z"}""",
+            )
+
+        assertTrue(generated, generated.contains("enabled = true"))
+        assertTrue(generated, generated.contains("initial = 'a'"))
+    }
 }
