@@ -91,8 +91,14 @@ abstract class GenerateMockValuesTask : DefaultTask() {
         }
 
         val generated = source().valuesFor(undecided)
-        MockValueFiles.writeValues(valuesFile, existing.mergedWith(generated))
-        logger.lifecycle("[PrevHam] wrote ${generated.size} value(s) to '$valuesFile'")
+        val merged = existing.mergedWith(generated)
+        MockValueFiles.writeValues(valuesFile, merged)
+        // Both counts, because they answer different questions: how many came back this run, and
+        // what the file holds now. Reporting only the first reads as "nothing was written" when a
+        // run produces nothing, which is wrong - what was already decided is still there.
+        logger.lifecycle(
+            "[PrevHam] ${generated.size} new value(s); ${merged.size} in '$valuesFile'",
+        )
     }
 
     /**

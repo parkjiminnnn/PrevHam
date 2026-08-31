@@ -1,6 +1,5 @@
 package io.github.parkjiminnnn.gradle
 
-import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import java.io.File
 
@@ -39,14 +38,44 @@ internal object MockValueFiles {
             }.toMap()
     }
 
-    /** Writes the values sorted, so a re-run produces a diff of what changed rather than a reshuffle. */
+    /**
+     * Writes the values sorted, so a re-run produces a diff of what changed rather than a reshuffle.
+     *
+     * Written here rather than with JsonOutput, which escapes every non-ASCII character:
+     * `"제 1회 대학 음악제"` comes back as `"\uc81c 1\ud68c …"`. That is valid JSON and reads back
+     * correctly, but this file exists to be opened and edited by hand - a value nobody can read is a
+     * value nobody will correct. JSON is UTF-8, so the characters need no escaping at all.
+     */
     fun writeValues(
         file: File,
         values: Map<String, String>,
     ) {
         file.parentFile?.mkdirs()
-        file.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(values.toSortedMap())) + "\n")
+        val body =
+            values.toSortedMap().entries.joinToString(",\n") { (slot, value) ->
+                "    ${slot.asJsonString()}: ${value.asJsonString()}"
+            }
+        file.writeText(if (body.isEmpty()) "{}\n" else "{\n$body\n}\n")
     }
+
+    // Only what JSON requires: the two structural characters and the control range. Everything else,
+    // including every non-ASCII character, is written as itself.
+    private fun String.asJsonString(): String =
+        buildString(length + 2) {
+            append('"')
+            this@asJsonString.forEach { character ->
+                when {
+                    character == '"' -> append("\\\"")
+                    character == '\\' -> append("\\\\")
+                    character == '\n' -> append("\\n")
+                    character == '\r' -> append("\\r")
+                    character == '\t' -> append("\\t")
+                    character < ' ' -> append("\\u%04x".format(character.code))
+                    else -> append(character)
+                }
+            }
+            append('"')
+        }
 }
 
 /**

@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer
 import org.gradle.api.logging.Logging
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -66,7 +67,7 @@ class OpenAiCompatibleMockValueSourceTest {
 
     @Test
     fun `returns the values the endpoint answered`() {
-        reply = { 200 to chatReply("""{"com.a.Festival.name": "2026 대동제"}""") }
+        reply = { 200 to chatReply("""{"Festival.name": "2026 대동제"}""") }
 
         val values = source().valuesFor(listOf(slot("name")))
 
@@ -79,7 +80,9 @@ class OpenAiCompatibleMockValueSourceTest {
 
         val body = requestBody()
         assertTrue(body, body.contains("\"model\":\"some-model\""))
-        assertTrue(body, body.contains("com.a.Festival.name"))
+        assertTrue(body, body.contains("Festival.name"))
+        // The long path is what a model fails to echo back, so it must not be what is asked for.
+        assertFalse(body, body.contains("com.a.Festival.name"))
         assertTrue(body, body.contains("json_object"))
         assertTrue(body, body.contains("ko"))
     }
@@ -160,7 +163,7 @@ class OpenAiCompatibleMockValueSourceTest {
     fun `drops a key it never asked about`() {
         // A garbled path is indistinguishable from a good one once written to the file.
         reply = {
-            200 to chatReply("""{"com.a.Festival.name": "kept", "com.a.Festival.invented": "dropped"}""")
+            200 to chatReply("""{"Festival.name": "kept", "Festival.invented": "dropped"}""")
         }
 
         val values = source().valuesFor(listOf(slot("name")))
@@ -171,7 +174,7 @@ class OpenAiCompatibleMockValueSourceTest {
 
     @Test
     fun `drops a blank answer`() {
-        reply = { 200 to chatReply("""{"com.a.Festival.name": "  "}""") }
+        reply = { 200 to chatReply("""{"Festival.name": "  "}""") }
 
         assertEquals(emptyMap<String, String>(), source().valuesFor(listOf(slot("name"))))
     }
@@ -184,5 +187,48 @@ class OpenAiCompatibleMockValueSourceTest {
 
         // Two entries are recorded per request - the body and the header.
         assertTrue("${received.size / 2} request(s)", received.size / 2 > 1)
+    }
+
+    @Test
+    fun `retries when the endpoint is busy`() {
+        // A free or shared endpoint queues rather than refusing, so one slow or rejected attempt is
+        // the normal case rather than a broken one.
+        var attempts = 0
+        reply = {
+            attempts++
+            if (attempts == 1) 503 to "busy" else 200 to chatReply("""{"Festival.name": "2026 대동제"}""")
+        }
+
+        val values = source().valuesFor(listOf(slot("name")))
+
+        assertEquals(2, attempts)
+        assertEquals("2026 대동제", values["com.a.Festival.name"])
+    }
+
+    @Test
+    fun `does not retry a request the endpoint will keep refusing`() {
+        // An expired key or an unknown model will not fix itself, and asking again only makes the
+        // wait longer before the same message.
+        var attempts = 0
+        reply = {
+            attempts++
+            401 to """{"error": "invalid api key"}"""
+        }
+
+        source().valuesFor(listOf(slot("name")))
+
+        assertEquals(1, attempts)
+    }
+
+    @Test
+    fun `gives up after a fixed number of attempts`() {
+        var attempts = 0
+        reply = {
+            attempts++
+            503 to "busy"
+        }
+
+        assertEquals(emptyMap<String, String>(), source().valuesFor(listOf(slot("name"))))
+        assertEquals(3, attempts)
     }
 }

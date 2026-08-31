@@ -61,25 +61,45 @@ internal class OpenAiCompatibleMockValueSource(
             .orEmpty()
             .let { it == "localhost" || it.startsWith("127.") || it == "::1" || it == "0.0.0.0" }
 
+    /**
+     * One chunk, retried while the failure looks like the endpoint rather than the request.
+     *
+     * A free or shared endpoint queues, and a queued request reads as a timeout. Nothing is retried
+     * on a 4xx: an expired key or an unknown model will not fix itself, and asking again only makes
+     * the wait longer before the same message.
+     */
     private fun ask(slots: List<MockValueSlot>): Map<String, String> {
         val body = requestBody(slots)
-        val response =
-            runCatching { client.send(request(body), HttpResponse.BodyHandlers.ofString()) }
-                .getOrElse { failure ->
-                    logger.warn("[PrevHam] request to '$baseUrl' failed: ${failure.message}")
-                    return emptyMap()
-                }
+        repeat(MAX_ATTEMPTS) { attempt ->
+            val last = attempt == MAX_ATTEMPTS - 1
+            val response =
+                runCatching { client.send(request(body), HttpResponse.BodyHandlers.ofString()) }
+                    .getOrElse { failure ->
+                        if (last) {
+                            logger.warn("[PrevHam] request to '$baseUrl' failed: ${failure.message}")
+                            return emptyMap()
+                        }
+                        logger.lifecycle(
+                            "[PrevHam] ${failure.message} - retrying (${attempt + 2} of $MAX_ATTEMPTS)",
+                        )
+                        Thread.sleep(RETRY_BACKOFF_MILLIS * (attempt + 1))
+                        return@repeat
+                    }
 
-        if (response.statusCode() !in 200..299) {
+            val status = response.statusCode()
+            if (status in 200..299) return validated(parseValues(response.body()), slots)
+
             // The body carries the reason - an expired key, an unknown model, a rate limit - and
             // guessing at which is less useful than showing it.
-            logger.warn(
-                "[PrevHam] '$baseUrl' answered ${response.statusCode()}: ${response.body().take(ERROR_EXCERPT)}",
-            )
-            return emptyMap()
+            val excerpt = response.body().take(ERROR_EXCERPT)
+            if (last || status !in RETRYABLE_STATUSES) {
+                logger.warn("[PrevHam] '$baseUrl' answered $status: $excerpt")
+                return emptyMap()
+            }
+            logger.lifecycle("[PrevHam] answered $status - retrying (${attempt + 2} of $MAX_ATTEMPTS)")
+            Thread.sleep(RETRY_BACKOFF_MILLIS * (attempt + 1))
         }
-
-        return validated(parseValues(response.body()), slots)
+        return emptyMap()
     }
 
     private fun request(body: String): HttpRequest =
@@ -126,22 +146,36 @@ internal class OpenAiCompatibleMockValueSource(
         }
 
     /**
-     * Keeps only answers to what was asked.
+     * Answers to what was asked, restored to their full slot paths.
      *
-     * A model may invent a key, garble one of the long paths, or answer with a blank. None of those
-     * can be told apart from a good answer once written to the file, so they are dropped here - and
-     * counted, because a source dropping most of its replies is worth knowing about before the file
-     * looks mysteriously incomplete.
+     * The reply is keyed by the short `Type.property` form the request used, and chunking has
+     * already made those unique within a request, so each maps back to exactly one slot. A key that
+     * maps to none was invented or altered, and a blank is not an answer; neither can be told from a
+     * good value once written to the file, so both are dropped - and counted, because a source
+     * losing most of its replies is worth knowing about before the file looks mysteriously
+     * incomplete.
      */
     private fun validated(
         values: Map<String, String>,
         asked: List<MockValueSlot>,
     ): Map<String, String> {
-        val wanted = asked.mapTo(mutableSetOf()) { it.slot }
-        val kept = values.filterKeys { it in wanted }.filterValues { it.isNotBlank() }
+        val byShortKey = asked.associateBy { with(MockValuePrompt) { it.shortKey() } }
+        val kept =
+            values
+                .mapNotNull { (key, value) ->
+                    val slot = byShortKey[key] ?: return@mapNotNull null
+                    if (value.isBlank()) null else slot.slot to value
+                }.toMap()
         val dropped = values.size - kept.size
         if (dropped > 0) {
-            logger.warn("[PrevHam] dropped $dropped unusable value(s) from a reply covering ${asked.size} slot(s)")
+            // The keys, not just the count: a reply is dropped for using keys we did not ask for, and
+            // which ones it used instead is the only thing that says whether the prompt, the
+            // validation, or the model is at fault. Counting alone sends you guessing.
+            logger.warn(
+                "[PrevHam] dropped $dropped unusable value(s) from a reply covering ${asked.size} slot(s)\n" +
+                    "  asked for: ${byShortKey.keys.sorted()}\n" +
+                    "  answered:  ${values.keys.sorted()}",
+            )
         }
         return kept
     }
@@ -151,7 +185,16 @@ internal class OpenAiCompatibleMockValueSource(
         // together. Types are never split, so a large one may exceed this on its own.
         const val MAX_SLOTS_PER_REQUEST = 40
         const val ERROR_EXCERPT = 300
-        val REQUEST_TIMEOUT: Duration = Duration.ofMinutes(2)
+        const val MAX_ATTEMPTS = 3
+        const val RETRY_BACKOFF_MILLIS = 2_000L
+
+        // A free or shared endpoint queues rather than refusing, so a slow answer is the normal
+        // case rather than a broken one. This is a task somebody runs deliberately and rarely -
+        // waiting is cheaper than failing and being run again.
+        val REQUEST_TIMEOUT: Duration = Duration.ofMinutes(5)
+
+        // Retried because the endpoint is busy or briefly unwell, not because the request is wrong.
+        val RETRYABLE_STATUSES = setOf(408, 429, 500, 502, 503, 504)
 
         fun defaultClient(): HttpClient =
             HttpClient
