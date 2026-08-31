@@ -2,6 +2,7 @@ package io.github.parkjiminnnn.gradle
 
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.Property
 import javax.inject.Inject
 
 /**
@@ -32,4 +33,26 @@ abstract class PrevHamExtension
          * did, so there is nothing in it to keep.
          */
         val slotManifest: RegularFileProperty = objects.fileProperty()
+
+        /**
+         * The OpenAI-compatible chat endpoint to ask for values, e.g.
+         * `https://integrate.api.nvidia.com/v1`.
+         *
+         * Required rather than defaulted, and PrevHam takes no position on which one. A default
+         * would endorse a provider, and would be half a convenience anyway - a key and a model are
+         * needed regardless, so nothing works without configuration either way. Unset, the task
+         * scaffolds the slot paths and leaves the values to be written by hand.
+         */
+        val baseUrl: Property<String> = objects.property(String::class.java)
+
+        /** The model to ask, as that endpoint names it. */
+        val model: Property<String> = objects.property(String::class.java)
+
+        /**
+         * The language to write values in.
+         *
+         * Configured rather than inferred: guessing from identifiers is unreliable, and a wrong
+         * guess produces values in the wrong language for a whole project.
+         */
+        val language: Property<String> = objects.property(String::class.java)
     }

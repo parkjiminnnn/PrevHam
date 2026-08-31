@@ -246,7 +246,9 @@ class PrevHamPluginTest {
         assertTrue(output, output.contains("Build the project first"))
     }
 
-    private fun TemporaryFolder.newFile(name: String): File = File(root, name).apply { parentFile.mkdirs() }
+    // Not named newFile: TemporaryFolder has a member by that name, members win over extensions, and
+    // JUnit's cannot create a nested path.
+    private fun TemporaryFolder.fileAt(path: String): File = File(root, path).apply { parentFile.mkdirs() }
 
     @Test
     fun `scaffolds the value file from a manifest`() {
@@ -319,5 +321,123 @@ class PrevHamPluginTest {
         assertTrue(output, output.contains("nothing to do"))
         val values = File(projectDir.root, "values.json").readText()
         assertTrue(values, values.contains("2026 대동제"))
+    }
+
+    @Test
+    fun `scaffolds the paths when no endpoint is configured`() {
+        // Writing the values by hand should not require naming a model: the paths are the part
+        // nobody can reasonably produce, and they are useful on their own.
+        projectDir.fileAt("build/generated/prevham/mock-value-slots.json").writeText(
+            """
+            {"slots": [{"slot": "com.a.Festival.name", "owner": "com.a.Festival",
+                        "name": "name", "type": "kotlin.String"}]}
+            """.trimIndent(),
+        )
+
+        val output =
+            build(
+                """
+                plugins {
+                    kotlin("jvm") version "2.2.10"
+                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("io.github.parkjiminnnn.prevham")
+                }
+                repositories { mavenCentral() }
+                """.trimIndent(),
+                "prevhamGenerateMockValues",
+            )
+
+        assertTrue(output, output.contains("no baseUrl/model configured"))
+        val written = File(projectDir.root, "src/main/prevham/mock-values.json").readText()
+        assertTrue(written, written.contains("com.a.Festival.name"))
+    }
+
+    @Test
+    fun `keeps a value that has already been decided`() {
+        projectDir.fileAt("build/generated/prevham/mock-value-slots.json").writeText(
+            """
+            {"slots": [{"slot": "com.a.Festival.name", "owner": "com.a.Festival",
+                        "name": "name", "type": "kotlin.String"}]}
+            """.trimIndent(),
+        )
+        projectDir.fileAt("src/main/prevham/mock-values.json").writeText(
+            """{"com.a.Festival.name": "written by hand"}""",
+        )
+
+        val output =
+            build(
+                """
+                plugins {
+                    kotlin("jvm") version "2.2.10"
+                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("io.github.parkjiminnnn.prevham")
+                }
+                repositories { mavenCentral() }
+                """.trimIndent(),
+                "prevhamGenerateMockValues",
+            )
+
+        assertTrue(output, output.contains("nothing to do"))
+        val written = File(projectDir.root, "src/main/prevham/mock-values.json").readText()
+        assertTrue(written, written.contains("written by hand"))
+    }
+
+    @Test
+    fun `refuses a key set in the project's gradle properties`() {
+        // That file is normally committed, and setting the key there works perfectly - which is what
+        // makes it dangerous. Nothing would go wrong until the key was public.
+        projectDir.fileAt("gradle.properties").writeText("prevham.apiKey=leaked-key\n")
+        projectDir.fileAt("build/generated/prevham/mock-value-slots.json").writeText(
+            """
+            {"slots": [{"slot": "com.a.Festival.name", "owner": "com.a.Festival",
+                        "name": "name", "type": "kotlin.String"}]}
+            """.trimIndent(),
+        )
+
+        val output =
+            build(
+                """
+                plugins {
+                    kotlin("jvm") version "2.2.10"
+                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("io.github.parkjiminnnn.prevham")
+                }
+                repositories { mavenCentral() }
+                """.trimIndent(),
+                "prevhamGenerateMockValues",
+                expectFailure = true,
+            )
+
+        assertTrue(output, output.contains("normally committed"))
+        assertTrue(output, output.contains("local.properties"))
+        assertTrue(output, output.contains("PREVHAM_API_KEY"))
+        assertTrue(output, output.contains("compromised"))
+    }
+
+    @Test
+    fun `does not mistake a comment for a declaration`() {
+        // A gradle.properties explaining where the key should not go must not itself be refused.
+        projectDir.fileAt("gradle.properties").writeText("# do not put prevham.apiKey here\n")
+        projectDir.fileAt("build/generated/prevham/mock-value-slots.json").writeText(
+            """
+            {"slots": [{"slot": "com.a.Festival.name", "owner": "com.a.Festival",
+                        "name": "name", "type": "kotlin.String"}]}
+            """.trimIndent(),
+        )
+
+        val output =
+            build(
+                """
+                plugins {
+                    kotlin("jvm") version "2.2.10"
+                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("io.github.parkjiminnnn.prevham")
+                }
+                repositories { mavenCentral() }
+                """.trimIndent(),
+                "prevhamGenerateMockValues",
+            )
+
+        assertTrue(output, output.contains("no baseUrl/model configured"))
     }
 }
