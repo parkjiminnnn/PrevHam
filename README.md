@@ -34,6 +34,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Collection support | Generates mock `List`, `Set`, `Map` values |
 | Enum support | Picks a valid mock value from enum constants |
 | Object support | References an `object`, `data object`, nested object or companion directly — the singleton itself, not a mock of it |
+| Mock values | Supply real-looking values for `String` and numeric slots from a committed file — written by hand, or filled in by a language model through a task that never runs during a build |
 | Nested data classes | Recursive mock generation for nested data classes and collections, as deep as the model goes — bounded by cycle detection, not a depth limit |
 | Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
 | Sealed type support | Builds a real subtype (e.g. `UiState.Loading`) instead of mocking the sealed type |
@@ -230,6 +231,66 @@ A configured `name` becomes the variants' common prefix, so each stays distingui
 
 ---
 
+### 5. (Optional) Fill the Previews with real-looking values
+
+Every string is `"mock"` and every number is `1` by default, which renders but hides the overflow and
+wrapping a real string would expose. Supply values instead:
+
+```json
+// app/src/main/prevham/mock-values.json — committed
+{
+  "com.example.app.Festival.festivalName": "제 1회 대학 음악제",
+  "com.example.app.Festival.expectedVisitors": "12000"
+}
+```
+
+Write it by hand, or have a language model fill it in from the property names and types:
+
+```kotlin
+// build.gradle.kts
+prevham {
+    // The language values are written in. Configured rather than guessed from your identifiers,
+    // since a wrong guess writes a whole project's Previews in the wrong language.
+    language = "ko"
+
+    // Any endpoint accepting a POST to {baseUrl}/chat/completions — the shape most providers call
+    // "OpenAI-compatible". NVIDIA NIM, OpenAI, Groq and Ollama all speak it, so only these two
+    // lines change between them. There is no default: nothing is called unless you name it.
+    baseUrl = "https://integrate.api.nvidia.com/v1"
+
+    // The model id exactly as that endpoint names it, usually publisher/name.
+    model = "meta/llama-3.3-70b-instruct"
+}
+```
+
+```properties
+# local.properties — gitignored by default, so the key stays out of the repository.
+# PREVHAM_API_KEY in the environment works too, and is the one to use in CI.
+# Setting it in the project's gradle.properties is refused: that file is normally committed.
+prevham.apiKey=…
+```
+
+A local endpoint needs no key at all:
+
+```kotlin
+prevham {
+    language = "ko"
+    baseUrl = "http://localhost:11434/v1"   // Ollama, or anything else on this machine
+    model = "llama3.2"
+}
+```
+
+```bash
+./gradlew prevhamGenerateMockValues
+```
+
+**Builds never call the model.** Values are generated once, committed, and read from the file
+afterwards — so teammates and CI need no key, offline builds work, and a value that comes back wrong
+can be corrected by hand and stays corrected.
+
+> Everything about this — the endpoint, where the key goes, what can take a value, and what happens
+> when any of it fails — is in [`docs/mock-values.md`](docs/mock-values.md).
+
 ## ⚙️ How It Works
 
 PrevHam runs entirely inside the Kotlin compilation pipeline via KSP — nothing happens at runtime.
@@ -245,7 +306,7 @@ flowchart LR
 
 1. **Resolve** — `PrevSymbolProcessor` asks the KSP `Resolver` for every symbol annotated with `@Prev`.
 2. **Analyze** — each annotated function's parameter list is inspected: type, nullability, and shape (primitive, data class, collection, enum, interface). The `@Prev` annotation's own arguments are also read: the variant axes (`darkMode`, `locales`, `fontScales`, `devices`) decide how many `@Preview` annotations to emit, and the remaining settings are applied to all of them.
-3. **Generate mocks** — a dedicated mock generator produces a compile-time-safe value for each supported parameter type.
+3. **Generate mocks** — a dedicated mock generator produces a compile-time-safe value for each supported parameter type. Where a committed value file supplies one for a `String` or numeric slot, that value is used instead of the default (see [`docs/mock-values.md`](docs/mock-values.md)); the file is only ever read here, never written or fetched.
 4. **Emit source** — [KotlinPoet](https://square.github.io/kotlinpoet/) assembles a new `@Preview @Composable` function that calls the original composable with the generated mocks, stacking one `@Preview` per requested variant (Compose's `@Preview` is `@Repeatable`).
 5. **Compile** — the generated file is fed back into the same compilation unit, so the Preview is available immediately, with full IDE support.
 
