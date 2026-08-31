@@ -48,4 +48,16 @@ class MockValuesTest {
 
         assertTrue(result.isFailure)
     }
+
+    @Test
+    fun `treats a blank value as not decided yet`() {
+        // The generation task scaffolds missing slots with an empty value so their paths are there
+        // to fill in. Until one is filled the Preview should read as it did before, not show
+        // nothing at all.
+        val values = MockValues.from(fileOf("""{"a": "", "b": "   ", "c": "real"}""")).getOrThrow()
+
+        assertNull(values["a"])
+        assertNull(values["b"])
+        assertEquals("real", values["c"])
+    }
 }

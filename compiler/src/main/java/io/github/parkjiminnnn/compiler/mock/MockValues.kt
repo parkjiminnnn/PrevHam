@@ -22,7 +22,10 @@ import java.io.File
 internal class MockValues(
     private val values: Map<String, String>,
 ) {
-    operator fun get(slot: String): String? = values[slot]
+    // A blank value means "not decided yet", not "use an empty string". The generation task
+    // scaffolds every missing slot with one so the paths are there to fill in, and until they are
+    // filled the Preview should read as it did before rather than showing nothing at all.
+    operator fun get(slot: String): String? = values[slot]?.takeIf { it.isNotBlank() }
 
     val isEmpty: Boolean get() = values.isEmpty()
 
