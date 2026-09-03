@@ -53,3 +53,9 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
+// Writes the list of slots a value could be supplied for, so the generation task can ask about the
+// ones that have none. A build output, not a source of truth - the committed file is the value file.
+ksp {
+    arg("prevham.slotManifest", "${layout.buildDirectory.get()}/generated/prevham/mock-value-slots.json")
+}

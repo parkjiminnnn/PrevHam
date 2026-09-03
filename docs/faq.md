@@ -142,6 +142,32 @@ Keeping the composable `private` is a perfectly good reason to not use `@Prev` o
 annotation and writing a `@Preview` by hand in the same file is a supported outcome, not a
 workaround.
 
+## Everything in my Preview says "mock" — can it show real-looking data?
+
+Yes. Supply values in a committed file and PrevHam uses them instead of its defaults:
+
+```json
+{ "com.example.app.Festival.festivalName": "제 1회 대학 음악제" }
+```
+
+Write it by hand, or run `./gradlew prevhamGenerateMockValues` to have a language model fill it in
+from the property names and types. **Builds never call the model** — values are generated once,
+committed, and read from the file afterwards, so teammates and CI need no key and offline builds
+work. Full details in [mock-values.md](mock-values.md).
+
+`String` and the numeric types can take a value today. `Boolean`, `Char`, dates, enums and members of
+mocked types cannot.
+
+## Does PrevHam send my code anywhere?
+
+Not during a build, and not at all unless you run `prevhamGenerateMockValues` and configure an
+endpoint yourself. That task sends **property names and their types** — `Festival.festivalName :
+String` — to the endpoint named in `prevham { baseUrl = … }`. It sends no source, no values, and no
+part of your project other than those names.
+
+There is no default endpoint, so nothing is called unless you name one. Everything else — the whole
+ordinary build — runs offline.
+
 ## How do I fix a skipped `@Prev`?
 
 In rough order of preference:

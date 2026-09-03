@@ -26,6 +26,9 @@ internal class MockContext private constructor(
     private val remainingSteps: Int,
     private val isBlocked: Boolean,
     private val stubBudget: StubBudget,
+    private val values: MockValues,
+    private val slotRecorder: SlotRecorder,
+    private val slot: MockSlot?,
 ) {
     /**
      * Whether another member stub can still be afforded for this composable, consuming one if so.
@@ -41,30 +44,70 @@ internal class MockContext private constructor(
      */
     fun canAffordStub(): Boolean = stubBudget.tryConsume()
 
+    /**
+     * The value configured for the slot being filled, or null when there is none.
+     *
+     * A slot names where a value is declared rather than its type - `com.example.Festival.name` -
+     * because type alone cannot choose between `Festival.name` and `User.name`.
+     */
+    fun slotValue(): String? = slot?.let { values[it.path] }
+
+    /**
+     * Notes that the slot being filled can take a value, for the manifest.
+     *
+     * Called by the generator that consumes the value rather than by whatever created the slot, so
+     * the manifest lists the places a value would actually be used - not every parameter walked
+     * past on the way. Recording while generating and never while deciding keeps [canMock] free of
+     * side effects, the same rule the stub budget follows.
+     */
+    fun recordSlot() {
+        slot?.let(slotRecorder::record)
+    }
+
     /** Whether an inner type can be mocked from here, without expanding it. */
-    fun canMock(type: KSType): Boolean {
+    fun canMock(
+        type: KSType,
+        slot: MockSlot? = null,
+    ): Boolean {
         if (isBlocked) return false
         val resolved = type.resolveTypeAliases()
-        return registry.supports(resolved, descend(resolved))
+        return registry.supports(resolved, descend(resolved, slot))
     }
 
     /** The mock for an inner type. Only valid when [canMock] returned true for the same type. */
-    fun mock(type: KSType): CodeBlock {
+    fun mock(
+        type: KSType,
+        slot: MockSlot? = null,
+    ): CodeBlock {
         val resolved = type.resolveTypeAliases()
-        return registry.generate(resolved, descend(resolved))
+        return registry.generate(resolved, descend(resolved, slot))
     }
 
-    private fun descend(type: KSType): MockContext {
+    // The slot travels with the descent rather than being remembered: it names the one place being
+    // filled right now, and anything deeper is a different place with a slot of its own (or none).
+    private fun descend(
+        type: KSType,
+        slot: MockSlot?,
+    ): MockContext {
         val key = type.pathKey()
         // Entering a type already being expanded on this path would recurse forever - this is the
         // `data class Node(val next: Node)` case. Anything finite, however deeply nested, never
         // repeats a key and runs to completion.
         if (remainingSteps == 0 || key in expanding) {
-            return MockContext(registry, expanding, remainingSteps = 0, isBlocked = true, stubBudget)
+            return MockContext(registry, expanding, 0, isBlocked = true, stubBudget, values, slotRecorder, slot)
         }
         // The budget is shared rather than copied - it bounds the whole composable's output, not
         // one path through it.
-        return MockContext(registry, expanding + key, remainingSteps - 1, isBlocked = false, stubBudget)
+        return MockContext(
+            registry,
+            expanding + key,
+            remainingSteps - 1,
+            isBlocked = false,
+            stubBudget,
+            values,
+            slotRecorder,
+            slot,
+        )
     }
 
     // Type arguments belong in the key: keyed on the declaration alone, the outer and inner Box of
@@ -95,13 +138,20 @@ internal class MockContext private constructor(
         // or a "Method too large" from the Kotlin backend.
         const val MAX_STUBS = 500
 
-        fun root(registry: MockGeneratorRegistry): MockContext =
+        fun root(
+            registry: MockGeneratorRegistry,
+            values: MockValues = MockValues.EMPTY,
+            slotRecorder: SlotRecorder = SlotRecorder(),
+        ): MockContext =
             MockContext(
                 registry,
                 expanding = emptySet(),
                 remainingSteps = MAX_PATH_LENGTH,
                 isBlocked = false,
                 stubBudget = StubBudget(MAX_STUBS),
+                values = values,
+                slotRecorder = slotRecorder,
+                slot = null,
             )
     }
 }

@@ -11,11 +11,24 @@ internal data class MockParameter(
     val name: String,
     val type: KSType,
     val hasDefault: Boolean,
+    // Where this value is declared - null when the owner has no qualified name to build one from.
+    val slot: MockSlot? = null,
 )
 
-internal fun KSValueParameter.toMockParameter(type: KSType = this.type.resolve()): MockParameter? {
+internal fun KSValueParameter.toMockParameter(
+    type: KSType = this.type.resolve(),
+    owner: String? = null,
+): MockParameter? {
     val name = name?.asString() ?: return null
-    return MockParameter(name, type, hasDefault)
+    // Resolved, not declared: a `typealias UserName = String` slot takes a String, and a consumer
+    // of the manifest reading "UserName" has no way to learn that.
+    val typeName =
+        type
+            .resolveTypeAliases()
+            .declaration.qualifiedName
+            ?.asString()
+    val slot = if (owner != null && typeName != null) MockSlot(owner, name, typeName) else null
+    return MockParameter(name, type, hasDefault, slot)
 }
 
 // Shared by the processor, for a @Prev function's own parameters, and by DataClassMockGenerator,
@@ -24,7 +37,7 @@ internal fun KSValueParameter.toMockParameter(type: KSType = this.type.resolve()
 internal fun firstUnsupportedParameter(
     parameters: List<MockParameter>,
     context: MockContext,
-): MockParameter? = parameters.firstOrNull { parameter -> !context.canMock(parameter.type) && !parameter.hasDefault }
+): MockParameter? = parameters.firstOrNull { parameter -> !context.canMock(parameter.type, parameter.slot) && !parameter.hasDefault }
 
 internal fun buildMockArguments(
     parameters: List<MockParameter>,
@@ -32,8 +45,8 @@ internal fun buildMockArguments(
 ): Map<String, CodeBlock> {
     val arguments = LinkedHashMap<String, CodeBlock>()
     for (parameter in parameters) {
-        if (context.canMock(parameter.type)) {
-            arguments[parameter.name] = context.mock(parameter.type)
+        if (context.canMock(parameter.type, parameter.slot)) {
+            arguments[parameter.name] = context.mock(parameter.type, parameter.slot)
         }
     }
     return arguments

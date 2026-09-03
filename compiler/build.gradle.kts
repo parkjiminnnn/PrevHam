@@ -21,6 +21,7 @@ mavenPublishing {
 dependencies {
     implementation(libs.ksp.symbol.processing.api)
     implementation(libs.kotlinpoet)
+    implementation(libs.kotlinx.serialization.json)
     compileOnly(libs.autoservice.annotations)
     ksp(libs.autoservice.ksp)
 

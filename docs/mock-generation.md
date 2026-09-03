@@ -165,6 +165,38 @@ parameters in declaration order. `typealias Swapped<A, B> = Pair<B, A>` and
 `typealias Nested<T> = Box<Box<T>>` are deliberately not resolved: substituting positionally would
 produce code that compiles and mocks the wrong types, so they stay unsupported instead, which is
 what every alias did before.
+
+## Slots: a value belongs to a place, not a type
+
+A generator is chosen by type, but the *value* often should not be:
+
+```kotlin
+data class Festival(val name: String)   // "제 1회 대학 음악제"
+data class User(val name: String)       // "김지민"
+```
+
+Both are `String`. `StringMockGenerator` sees only a `KSType`, so on its own it cannot tell them
+apart — which is why the declaring path travels with the recursion as a **slot**:
+
+```
+com.example.app.Festival.name
+```
+
+`MockParameter` carries one, built from the owner's qualified name; `MockContext.canMock` and `mock`
+both take it, so the two agree on the same question; and a leaf generator asks
+`context.slotValue()` before falling back to its default. `StringMockGenerator` and
+`PrimitiveMockGenerator` do; nothing else does.
+
+`recordSlot()` sits beside it, and is called at the same point — where a value is *consumed*, not
+where a slot is created. The manifest then lists the places a value would actually be used rather
+than every parameter walked past on the way. Recording happens while generating and never while
+deciding, so `canMock` stays free of side effects — the same rule the stub budget follows.
+
+A member of a mocked type has no slot: it is reached by mocking rather than construction, so it never
+passes a leaf generator. See [#103](https://github.com/parkjiminnnn/PrevHam/issues/103).
+
+The file itself, where it comes from and what happens when it is wrong: [mock-values.md](mock-values.md).
+
 ## `MockParameter`: decoupling "what to mock" from "how its type was found"
 
 ```kotlin
