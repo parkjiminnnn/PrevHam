@@ -171,7 +171,7 @@ class PrevHamPluginTest {
     }
 
     @Test
-    fun `sets both KSP options so the two sides agree on a path`() {
+    fun `sets the KSP options so the two sides agree on a path`() {
         // The compiler writes the manifest and reads the values; the task reads the manifest and
         // writes the values. Left to the consumer that is the same path written twice, with nothing
         // to notice when they drift - so the plugin owns both.
@@ -198,6 +198,34 @@ class PrevHamPluginTest {
         assertTrue(output, output.contains("kspArg prevham.slotManifest="))
         assertTrue(output, output.contains("src/main/prevham/mock-values.json"))
         assertTrue(output, output.contains("generated/prevham/mock-value-slots.json"))
+        // On unless asked otherwise: the people it exists for are the ones already using a value
+        // file, and they are the ones who would never think to switch it on.
+        assertTrue(output, output.contains("kspArg prevham.warnOnMissingValues=true"))
+    }
+
+    @Test
+    fun `passes the missing-value warning switch through`() {
+        val output =
+            build(
+                """
+                plugins {
+                    kotlin("jvm") version "2.2.10"
+                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("io.github.parkjiminnnn.prevham")
+                }
+                repositories { mavenCentral() }
+                prevham {
+                    warnOnMissingValues.set(false)
+                }
+                val kspExtension = extensions.getByType(com.google.devtools.ksp.gradle.KspExtension::class.java)
+                tasks.register("printKspArgs") {
+                    doLast { kspExtension.arguments.forEach { println("kspArg " + it.key + "=" + it.value) } }
+                }
+                """.trimIndent(),
+                "printKspArgs",
+            )
+
+        assertTrue(output, output.contains("kspArg prevham.warnOnMissingValues=false"))
     }
 
     @Test
