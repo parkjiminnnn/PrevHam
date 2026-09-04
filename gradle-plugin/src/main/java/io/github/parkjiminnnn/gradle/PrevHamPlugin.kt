@@ -35,6 +35,7 @@ class PrevHamPlugin : Plugin<Project> {
         val extension = target.extensions.create(EXTENSION_NAME, PrevHamExtension::class.java)
         extension.mockValues.convention(target.layout.projectDirectory.file(DEFAULT_MOCK_VALUES))
         extension.slotManifest.convention(target.layout.buildDirectory.file(DEFAULT_SLOT_MANIFEST))
+        extension.warnOnMissingValues.convention(true)
 
         target.tasks.register(GENERATE_TASK_NAME, GenerateMockValuesTask::class.java) { task ->
             task.slotManifest.set(extension.slotManifest)

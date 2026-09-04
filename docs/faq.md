@@ -155,6 +155,10 @@ from the property names and types. **Builds never call the model** — values ar
 committed, and read from the file afterwards, so teammates and CI need no key and offline builds
 work. Full details in [mock-values.md](mock-values.md).
 
+A build warns about slots the file has nothing for, so a property added after the values were written
+does not sit on its default unnoticed. `warnOnMissingValues = false` in the `prevham { }` block turns
+that off.
+
 `String` and the numeric types can take a value today. `Boolean`, `Char`, dates, enums and members of
 mocked types cannot.
 

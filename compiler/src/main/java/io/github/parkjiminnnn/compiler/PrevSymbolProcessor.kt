@@ -12,6 +12,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Visibility
 import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
+import io.github.parkjiminnnn.compiler.mock.MissingValueReport
 import io.github.parkjiminnnn.compiler.mock.MockContext
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
 import io.github.parkjiminnnn.compiler.mock.MockValues
@@ -27,6 +28,7 @@ internal class PrevSymbolProcessor(
     private val logger: KSPLogger,
     private val mockValues: MockValues = MockValues.EMPTY,
     private val slotManifest: File? = null,
+    private val warnOnMissingValues: Boolean = false,
 ) : SymbolProcessor {
     private val mockGenerators = MockGeneratorRegistry.default()
 
@@ -44,12 +46,18 @@ internal class PrevSymbolProcessor(
     }
 
     /**
-     * Writes the slot manifest, once every round has run.
+     * Reports on the round as a whole, once every round has run.
      *
-     * In finish() rather than process() because a slot found in a later round still belongs in the
-     * manifest, and a file rewritten per round would be incomplete until the last one.
+     * In finish() rather than process() because a slot found in a later round still counts: a
+     * manifest rewritten per round would be incomplete until the last one, and a warning raised per
+     * round would name slots that a later round goes on to decide.
      */
     override fun finish() {
+        writeSlotManifest()
+        warnAboutUndecidedSlots()
+    }
+
+    private fun writeSlotManifest() {
         val file = slotManifest ?: return
         runCatching { SlotManifest.write(file, slots.recorded()) }
             .onFailure { failure ->
@@ -57,6 +65,26 @@ internal class PrevSymbolProcessor(
                 // not fail a compilation that has otherwise produced every Preview it was asked for.
                 logger.warn("[PrevHam] could not write the slot manifest to '$file': ${failure.message}")
             }
+    }
+
+    /**
+     * Says which slots the value file has nothing for.
+     *
+     * A warning rather than an error, and nothing is fetched to fix it. Falling back to the default
+     * is the correct behaviour for an undecided slot - the only thing missing is anyone being told,
+     * and telling them is the whole of this. A build that went and asked for the values instead
+     * would need credentials on every machine that compiles and would rewrite a committed file
+     * behind whoever ran it.
+     */
+    private fun warnAboutUndecidedSlots() {
+        if (!warnOnMissingValues) return
+        val undecided =
+            slots
+                .recorded()
+                .map { it.path }
+                .distinct()
+                .filter { mockValues[it] == null }
+        MissingValueReport.message(undecided)?.let(logger::warn)
     }
 
     private fun processFunction(function: KSFunctionDeclaration) {

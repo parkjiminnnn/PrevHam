@@ -199,6 +199,68 @@ Adding a property therefore costs one slot rather than a whole regeneration:
 
 ---
 
+## Knowing when the file has gone stale
+
+A value file goes out of date on its own. Adding a property is the ordinary case and the one with no
+signal — the build succeeds, the Preview renders, and the new field reads `"mock"` beside fields that
+read like real data:
+
+```kotlin
+data class Festival(
+    val festivalName: String,
+    val universityName: String,
+    val slogan: String,          // added later
+)
+```
+
+The cost lands on the feature rather than on any one Preview: a file that covered a project when it
+was written covers a shrinking part of it a month later, and there is no moment where that becomes
+visible. So the build says so:
+
+```
+w: [ksp] [PrevHam] 3 slot(s) have no mock value:
+  com.example.app.Festival.slogan
+  com.example.app.Lineup.stageName
+  com.example.app.Notice.body
+
+Run ./gradlew prevhamGenerateMockValues to fill them in.
+Set warnOnMissingValues = false in the prevham { } block to stop hearing about it.
+```
+
+Nothing new is computed for this. The compiler already records every slot it meets and already reads
+the value file, both in the same round — the difference between them is the answer.
+
+Long lists are truncated after ten paths. Adopting this mid-project leaves every slot undecided on the
+first build, and a wall of paths helps nobody; the count and the task name are what is worth reading
+there.
+
+### It is still only a build
+
+Nothing is fetched to fix this. Falling back to the default is the correct behaviour for an undecided
+slot — the only thing missing was anyone being told, and telling them is the whole of it. A build that
+went and asked for the values instead would need a key on every machine that compiles and would
+rewrite a committed file behind whoever ran it.
+
+### When it stays quiet
+
+| | |
+|---|---|
+| No value file configured | The feature is not in use |
+| A configured file that is not there yet | The ordinary state before the task is first run |
+| Every slot decided | Nothing to say |
+| `warnOnMissingValues = false` | Off by choice |
+
+On by default, because the people it exists for are the ones already using a value file — and they are
+exactly the ones who would never think to switch it on.
+
+```kotlin
+prevham {
+    warnOnMissingValues = false
+}
+```
+
+---
+
 ## What can take a value
 
 | | | |
@@ -229,8 +291,8 @@ literal that does not compile.
 
 | | |
 |---|---|
-| No value file | Identical to not using the feature |
-| File missing, unreadable, or malformed JSON | Warning, defaults used |
+| No value file, or a configured file that is not there yet | Identical to not using the feature |
+| An unreadable or malformed file | Warning, defaults used |
 | A slot absent from the file | That one slot falls back |
 | A blank value | Falls back — a blank means "not decided yet" |
 | A number that is not a number, or does not fit | Falls back |

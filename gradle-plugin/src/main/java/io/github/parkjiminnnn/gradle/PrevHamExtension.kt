@@ -55,4 +55,17 @@ abstract class PrevHamExtension
          * guess produces values in the wrong language for a whole project.
          */
         val language: Property<String> = objects.property(String::class.java)
+
+        /**
+         * Whether a build says which slots have no value yet.
+         *
+         * On by default, because the people it exists for are the ones already using a value file
+         * and they are exactly the ones who would never think to switch it on. Adding a field is the
+         * ordinary case and the one with no signal otherwise - the build succeeds, the Preview
+         * renders, and the new field reads `"mock"` beside fields that read like real data.
+         *
+         * A project that has never run the generation task hears nothing regardless: with no value
+         * file there is nothing to be missing from.
+         */
+        val warnOnMissingValues: Property<Boolean> = objects.property(Boolean::class.java)
     }

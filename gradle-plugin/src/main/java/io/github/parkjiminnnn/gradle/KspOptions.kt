@@ -3,11 +3,11 @@ package io.github.parkjiminnnn.gradle
 import org.gradle.api.Project
 
 /**
- * Sets the two options the compiler reads.
+ * Sets the options the compiler reads.
  *
- * Both are set from one place because the two sides have to agree on them: the compiler writes the
- * manifest and reads the values, the task reads the manifest and writes the values. Left to the
- * consumer that is the same path written twice, with nothing to notice when they drift.
+ * The two paths are set from one place because the two sides have to agree on them: the compiler
+ * writes the manifest and reads the values, the task reads the manifest and writes the values. Left
+ * to the consumer that is the same path written twice, with nothing to notice when they drift.
  *
  * ### Why this reaches the extension by name
  *
@@ -59,9 +59,15 @@ internal object KspOptions {
                 .get()
                 .asFile.absolutePath,
         )
+        arg.invoke(
+            ksp,
+            WARN_ON_MISSING_VALUES_OPTION,
+            extension.warnOnMissingValues.getOrElse(true).toString(),
+        )
     }
 
     private const val KSP_EXTENSION_NAME = "ksp"
     const val MOCK_VALUES_OPTION = "prevham.mockValues"
     const val SLOT_MANIFEST_OPTION = "prevham.slotManifest"
+    const val WARN_ON_MISSING_VALUES_OPTION = "prevham.warnOnMissingValues"
 }
