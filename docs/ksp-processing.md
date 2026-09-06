@@ -25,8 +25,10 @@ class PrevSymbolProcessorProvider : SymbolProcessorProvider {
 
 ```kotlin
 override fun process(resolver: Resolver): List<KSAnnotated> {
-    val symbols = resolver.getSymbolsWithAnnotation(PREV_ANNOTATION_NAME).toList()
-    symbols.filterIsInstance<KSFunctionDeclaration>().forEach(::processFunction)
+    resolver
+        .getSymbolsWithAnnotation(PREV_ANNOTATION_NAME)
+        .filterIsInstance<KSFunctionDeclaration>()
+        .forEach(::processFunction)
     return emptyList()
 }
 ```
@@ -133,6 +135,55 @@ the `@Preview` it generates without `runtime` taking on a dependency.
 `name` is the one setting that isn't a plain pass-through: it becomes the variants' common prefix
 (`"Card - Dark Mode"`), since replacing their labels outright would leave several Previews sharing a
 single name.
+
+## Reporting on the round
+
+Three things are said once every round has run, not per round and not where they happen:
+
+```kotlin
+override fun finish() {
+    writeSlotManifest()
+    warnAboutUndecidedSlots()
+    reportRound()
+}
+
+// KSP calls this instead of finish() when the round reported an error.
+override fun onError() {
+    reportRound()
+}
+```
+
+`finish()` is the only place with a complete picture. A manifest rewritten per round is incomplete
+until the last one; a missing-value warning raised per round names slots a later round goes on to
+decide; and a per-round summary splits one project across several lines that each look like the whole
+picture.
+
+`onError()` matters more than it looks. KSP calls it **instead of** `finish()` when anything reported
+an error, so a summary written only in `finish()` never appears on the builds where a count is most
+worth having — the ones with a broken `@Prev` in them. Only the summary is repeated there: the
+manifest and the missing-value warning describe a compilation that produced Previews, and that one
+did not.
+
+### Why skips are gathered rather than warned about in place
+
+An unsupported parameter used to log a warning at the point it was found. It now records into a tally
+that `RoundReport` formats:
+
+```kotlin
+tally.skipped(
+    name = function.simpleName.asString(),
+    reason = "no mock generator available for parameter '${unsupported.name}'",
+)
+```
+
+One warning per skip, scattered through however many hundred lines of unrelated output a build
+produces, is easy to miss and impossible to count. Nothing is lost by moving them: KSP prints these
+without a source location either way, so the standalone warnings pointed at nothing the reader could
+click.
+
+The summary is a warning when something was skipped or failed, and `info` otherwise. KSP's logger has
+no level between the two, and a build that produced every Preview it was asked for has nothing wrong
+with it to warn about.
 
 ## Generic type resolution: `resolve()` vs. `asMemberOf()`
 
