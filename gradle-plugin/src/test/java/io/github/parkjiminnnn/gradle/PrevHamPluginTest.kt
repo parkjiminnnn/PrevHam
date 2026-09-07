@@ -88,7 +88,7 @@ class PrevHamPluginTest {
 
     @Test
     fun `does not apply KSP itself`() {
-        // Applying KSP here would pin the consumer's Kotlin version to PrevHam's, so its absence is
+        // Applying KSP here would stop a consumer moving to a newer Kotlin, so its absence is
         // a deliberate part of the contract rather than an oversight.
         val output =
             build(

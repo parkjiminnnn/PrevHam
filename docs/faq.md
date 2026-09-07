@@ -224,6 +224,37 @@ In rough order of preference:
 3. **Add a new `MockGenerator`** if the type shape is genuinely something PrevHam should support — see
    [`extending-mock-generators.md`](extending-mock-generators.md).
 
+## Why does my build say "Module was compiled with an incompatible version of Kotlin"?
+
+Your Kotlin is older than 2.2. The full error, from a real consumer build on Kotlin 2.0.21:
+
+```
+e: prevham-runtime-1.1.0.jar!/META-INF/runtime.kotlin_module
+   Module was compiled with an incompatible version of Kotlin.
+   The binary version of its metadata is 2.2.0, expected version is 2.0.0.
+```
+
+**Kotlin 2.2 is the minimum.** Compatibility runs one way — a newer compiler reads older metadata, never the reverse — so anything from 2.2 up works and nothing below does.
+
+`prevham-runtime` is compiled Kotlin, and compiled Kotlin carries the metadata version of whatever built it. This is unrelated to which KSP you picked: KSP is left to you so a *newer* Kotlin stays possible, and that does nothing for an older one.
+
+### Why not lower it
+
+Measured rather than assumed, and it does not work. Setting `languageVersion`/`apiVersion` to 2.0 does move `runtime`'s own metadata down, but the floor has a second source:
+
+```xml
+<!-- prevham-runtime's POM -->
+<dependency>
+  <groupId>org.jetbrains.kotlin</groupId>
+  <artifactId>kotlin-stdlib</artifactId>
+  <version>2.2.10</version>
+</dependency>
+```
+
+Gradle resolves to the highest version, so a consumer on 2.0.21 still gets stdlib 2.2.10 — which their compiler cannot read either. Dropping the stdlib to `compileOnly` would get around that, at the cost of trading a build error that names the problem for a `NoSuchMethodError` at runtime that does not.
+
+If you need PrevHam on an older Kotlin, [#79](https://github.com/parkjiminnnn/PrevHam/issues/79) has the measurements to reopen the decision with.
+
 ## Why did an old generated Preview file disappear after I renamed/deleted a composable?
 
 That's expected, and intentional — see

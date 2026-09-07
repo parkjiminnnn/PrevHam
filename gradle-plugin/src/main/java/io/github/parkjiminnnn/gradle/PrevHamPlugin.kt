@@ -102,8 +102,8 @@ class PrevHamPlugin : Plugin<Project> {
         val MISSING_KSP_MESSAGE =
             """
             PrevHam needs the KSP plugin, which it deliberately doesn't apply for you: a KSP version
-            is tied to a Kotlin version, so declaring it yourself keeps PrevHam from pinning your
-            Kotlin version. Add it to your plugins block at the version matching your Kotlin:
+            is tied to a Kotlin version, so declaring it yourself leaves you free to move to a newer
+            Kotlin. Add it to your plugins block at the version matching your Kotlin:
 
                 plugins {
                     id("$KSP_PLUGIN_ID") version "<version for your Kotlin>"

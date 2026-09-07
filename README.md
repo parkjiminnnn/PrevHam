@@ -9,7 +9,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.parkjiminnnn/prevham-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/io.github.parkjiminnnn)
 [![CI](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml/badge.svg)](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.2.10-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.2%2B-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
 [![KSP](https://img.shields.io/badge/KSP-2.2.10--2.0.2-purple.svg)](https://github.com/google/ksp)
 
 [Why PrevHam?](#-why-prevham) •
@@ -98,6 +98,11 @@ fun UserCard(
 
 > Published versions are listed on [Maven Central](https://central.sonatype.com/namespace/io.github.parkjiminnnn).
 
+### Requirements
+
+**Kotlin 2.2 or newer.** A newer Kotlin is fine; an older one cannot consume PrevHam at all — see
+[why](docs/faq.md#why-does-my-build-say-module-was-compiled-with-an-incompatible-version-of-kotlin).
+
 ### 1. Apply the plugins
 
 ```kotlin
@@ -110,7 +115,9 @@ plugins {
 
 That's the whole setup — the PrevHam plugin declares `prevham-runtime`, `prevham-compiler` and MockK for you, all at its own version, so they can't drift apart.
 
-The KSP version is yours to pick, and deliberately so: a KSP version is tied to a Kotlin version, and pinning it here would pin your Kotlin version to PrevHam's. Use the one matching your Kotlin.
+The KSP version is yours to pick, and deliberately so. A KSP version is tied to a Kotlin version, so applying KSP here would stop you moving to a newer Kotlin until PrevHam released against it. Use the one matching your Kotlin.
+
+That keeps the ceiling open, not the floor: `prevham-runtime` is compiled Kotlin, so 2.2 is still the minimum whatever KSP you pick.
 
 <details>
 <summary>Declaring the dependencies by hand instead</summary>
