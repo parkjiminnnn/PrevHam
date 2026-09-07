@@ -2,6 +2,7 @@ package io.github.parkjiminnnn.compiler.mock
 
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
@@ -86,7 +87,18 @@ internal class InterfaceMockGenerator : MockGenerator {
         getAllProperties()
             .filter { it.isStubbable() }
             .mapNotNull { property ->
-                if (!stubNecessity.isNeededFor(property.type.resolve())) return@mapNotNull null
+                val declaredType = property.type.resolve()
+                // Asked first, and it is the only chance: a configurable member's type is a literal,
+                // so StubNecessity answers "no stub needed" and the branch below never runs.
+                context.configuredValue(property.parentDeclaration, property.simpleName.asString(), declaredType)?.let {
+                    return@mapNotNull CodeBlock.of(
+                        "%M { this@mockk.%L } returns %L\n",
+                        EVERY_FUNCTION,
+                        property.simpleName.asString(),
+                        it,
+                    )
+                }
+                if (!stubNecessity.isNeededFor(declaredType)) return@mapNotNull null
                 if (!context.canAffordStub()) return@mapNotNull null
                 // asMemberOf rejects a nullable containing type outright ("Logger? is not a sub
                 // type of the class/interface that contains `name`"), and the exception would fail
@@ -106,14 +118,23 @@ internal class InterfaceMockGenerator : MockGenerator {
             .filter { it.isStubbable() }
             .mapNotNull { function ->
                 val declaredReturn = function.returnType?.resolve() ?: return@mapNotNull null
+                val every = if (Modifier.SUSPEND in function.modifiers) CO_EVERY_FUNCTION else EVERY_FUNCTION
+                // An argument matcher per parameter: PrevHam can't know which arguments the
+                // previewed code will pass, so every call gets the same stubbed value.
+                val matchers = function.parameters.joinToString { "any()" }
+                context.configuredValue(function.parentDeclaration, function.simpleName.asString(), declaredReturn)?.let {
+                    return@mapNotNull CodeBlock.of(
+                        "%M { this@mockk.%L(%L) } returns %L\n",
+                        every,
+                        function.simpleName.asString(),
+                        matchers,
+                        it,
+                    )
+                }
                 if (!stubNecessity.isNeededFor(declaredReturn)) return@mapNotNull null
                 if (!context.canAffordStub()) return@mapNotNull null
                 val returnType = function.asMemberOf(containing.makeNotNullable()).returnType ?: return@mapNotNull null
                 val value = context.stubValue(returnType) ?: return@mapNotNull null
-                // An argument matcher per parameter: PrevHam can't know which arguments the
-                // previewed code will pass, so every call gets the same stubbed value.
-                val matchers = function.parameters.joinToString { "any()" }
-                val every = if (Modifier.SUSPEND in function.modifiers) CO_EVERY_FUNCTION else EVERY_FUNCTION
                 CodeBlock.of(
                     "%M { this@mockk.%L(%L) } returns %L\n",
                     every,
@@ -122,6 +143,56 @@ internal class InterfaceMockGenerator : MockGenerator {
                     value,
                 )
             }.toList()
+
+    /**
+     * The value someone configured for a member, or null when it takes none.
+     *
+     * A data class field and the identical property on an interface used to behave differently: the
+     * field is **constructed**, so it flows through StringMockGenerator where a slot is consulted,
+     * while the interface member is **replaced by a mock** and a mock only says what `every { } returns`
+     * tells it to. In Android that gap covered an ordinary shape - a composable taking a ViewModel
+     * could be given no values at all (issue #103).
+     *
+     * ### Why this does not bring back #75
+     *
+     * #75 stubbed every member, and each stub's value was another mock whose members were stubbed in
+     * turn, so output grew as the product of member counts across the graph. Here a stub is only ever
+     * a literal, nothing recurses through it, and one is emitted only where a person wrote a value -
+     * so the count is a sum bounded by a curated file rather than by the shape of a dependency graph.
+     *
+     * ### Why the owner has to come from source
+     *
+     * The slot is recorded whether or not anything is stubbed, because a value cannot be written for
+     * a path the manifest never lists. That makes recording the thing to be careful with: without
+     * this gate, mocking a `java.time.LocalDate` would list its 56 stubbable members and send every
+     * one of them to a model to be answered - #75 by another route. The gate is the same one
+     * [isFromSource] draws for the stub search, applied to whichever type **declares** the member, so
+     * an inherited member of a compiled supertype is excluded too.
+     */
+    private fun MockContext.configuredValue(
+        declaring: KSDeclaration?,
+        name: String,
+        declaredType: KSType,
+    ): CodeBlock? {
+        // The declared type, never the one asMemberOf substitutes. A generic member reads as its
+        // type parameter here and is skipped, which is the answer wanted: Repository<String>.id and
+        // Repository<Int>.id are one declaring path and cannot hold two different values.
+        val type = declaredType.resolveTypeAliases()
+        if (!type.takesConfiguredValue()) return null
+        val owner =
+            (declaring as? KSClassDeclaration)
+                ?.takeIf { it.isFromSource() }
+                ?.qualifiedName
+                ?.asString() ?: return null
+        val slot = MockSlot(owner, name, type.declaration.qualifiedName?.asString() ?: return null)
+        if (!canMock(type, slot)) return null
+        // Generated even when nothing will be stubbed with it: the leaf generator is what records
+        // the slot, and an unlisted path is one nobody can write a value for.
+        val value = mock(type, slot)
+        if (!hasValueFor(slot)) return null
+        if (!canAffordStub()) return null
+        return value
+    }
 
     // The value to stub a member with, or null to leave that member to relaxed mode - either
     // because there is nothing worth stubbing (Unit) or because no generator can build its type.

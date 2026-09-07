@@ -192,8 +192,11 @@ where a slot is created. The manifest then lists the places a value would actual
 than every parameter walked past on the way. Recording happens while generating and never while
 deciding, so `canMock` stays free of side effects — the same rule the stub budget follows.
 
-A member of a mocked type has no slot: it is reached by mocking rather than construction, so it never
-passes a leaf generator. See [#103](https://github.com/parkjiminnnn/PrevHam/issues/103).
+A member of a mocked type is reached by mocking rather than construction, so it never arrives at a
+leaf generator on its own. `InterfaceMockGenerator` sends it to one anyway - that is what records the
+slot - and keeps the result only when a value was configured for it, emitting
+`every { this@mockk.title } returns "…"`. A member with no value is left to relaxed mode, so the stub
+count stays a sum bounded by a curated file rather than a product of the graph.
 
 The file itself, where it comes from and what happens when it is wrong: [mock-values.md](mock-values.md).
 

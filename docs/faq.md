@@ -192,8 +192,9 @@ A build warns about slots the file has nothing for, so a property added after th
 does not sit on its default unnoticed. `warnOnMissingValues = false` in the `prevham { }` block turns
 that off.
 
-`String` and the numeric types can take a value today. `Boolean`, `Char`, dates, enums and members of
-mocked types cannot.
+`String` and the numeric types can take a value, whether the value is built into a constructor call or
+stubbed onto a mock with `every { } returns`. `Boolean`, `Char`, dates, enums and generic members
+cannot.
 
 ## Does PrevHam send my code anywhere?
 
