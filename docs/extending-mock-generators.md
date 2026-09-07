@@ -18,13 +18,13 @@ internal interface MockGenerator {
 - `supports(type, context)` must be a pure check — no side effects, safe to call speculatively. Match
   on `type.declaration.qualifiedName?.asString()` for a specific known type (see
   `StringMockGenerator`), or on structural shape (`ClassKind`, `Modifier.DATA`, `type.arguments`, ...)
-  for a family of types (see `EnumMockGenerator`, `DataClassMockGenerator`).
+  for a family of types (see `EnumMockGenerator`, `ConstructorMockGenerator`).
 - `generate(type, context)` is only ever called after `supports` returned `true` for the same
   arguments — it can assume that precondition and doesn't need to re-validate it.
 - If your generator needs to recurse into other types (a field type, a collection element type, a
   function's return type), go through the context — `context.canMock(inner)` in `supports`, and
   `context.mock(inner)` in `generate` — rather than hardcoding a specific generator. See
-  `DataClassMockGenerator`, `CollectionMockGenerator`, and `FunctionTypeMockGenerator` for the
+  `ConstructorMockGenerator`, `CollectionMockGenerator`, and `FunctionTypeMockGenerator` for the
   pattern. The context carries the types already being expanded on this path, so going through it is
   what keeps your generator from recursing forever on a self-referential type.
 - Check `canMock` before calling `mock`, and honour a `false`. On a blocked context `canMock` returns
@@ -41,7 +41,7 @@ fun default(): MockGeneratorRegistry =
             StringMockGenerator(),
             EnumMockGenerator(),
             SealedTypeMockGenerator(),
-            DataClassMockGenerator(),
+            ConstructorMockGenerator(),
             CollectionMockGenerator(),
             FunctionTypeMockGenerator(),
             InterfaceMockGenerator(),

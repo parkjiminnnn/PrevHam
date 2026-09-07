@@ -198,7 +198,7 @@ data class Box<T>(val value: T)
 fun BoxCard(box: Box<String>) { ... }
 ```
 
-`box`'s declared type resolves fine to `Box<String>`. But `DataClassMockGenerator` needs to build a
+`box`'s declared type resolves fine to `Box<String>`. But `ConstructorMockGenerator` needs to build a
 mock instance of `Box`, which means it needs the type of `Box`'s **primary constructor parameter**
 (`value: T`) — and `KSValueParameter.type.resolve()` on that constructor parameter, taken in isolation,
 resolves `T` to itself (a `KSTypeParameter`, not a concrete `KSType` like `String`). `resolve()` has no

@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCompilerApi::class)
-class DataClassMockGeneratorTest {
+class ConstructorMockGeneratorTest {
     @Test
     fun `generates a named-argument constructor call for a flat data class`() {
         val result =
@@ -95,7 +95,7 @@ class DataClassMockGeneratorTest {
     @Test
     fun `skips Preview generation when a required field has no default and no generator supports it`() {
         // A non-data class field has no supporting generator combination here because
-        // DataClassMockGenerator requires Modifier.DATA - "owner" is a plain class with no
+        // ConstructorMockGenerator requires Modifier.DATA - "owner" is a plain class with no
         // no-arg constructor for InterfaceMockGenerator's mock either... instead we use a
         // required parameter of a type nested past the depth limit; see DepthLimitedRecursionTest
         // for the dedicated depth-limit case. This test covers the simpler "field type category
