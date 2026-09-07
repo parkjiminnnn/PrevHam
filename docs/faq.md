@@ -2,10 +2,12 @@
 
 ## Why did I get `no mock generator available for parameter 'X'`?
 
-The full warning looks like:
+It arrives in the round summary, under the counts:
 
 ```
-[PrevHam] skipping @Prev on 'FunctionName': no mock generator available for parameter 'X'
+w: [ksp] [PrevHam] 45 @Prev found: 43 generated, 2 skipped:
+  FunctionName: no mock generator available for parameter 'X'
+  OtherFunction: no mock generator available for parameter 'Y'
 ```
 
 It means parameter `X`'s type doesn't match any `MockGenerator` in the registry (see
@@ -16,6 +18,37 @@ than emitting a call that's missing a required argument.
 This is an all-or-nothing decision per function: if even one required parameter is unsupported, no
 Preview file is generated for that composable at all. Parameters that *do* have a default value are
 allowed to be unsupported — the generated call simply omits them and lets the default apply.
+
+## What does the round summary tell me?
+
+One line at the end of a build, saying what `@Prev` produced:
+
+```
+w: [ksp] [PrevHam] 45 @Prev found: 43 generated, 2 skipped:
+  TempInfiniteCard: no mock generator available for parameter 'node'
+  TempUnbreakableCard: no mock generator available for parameter 'a'
+```
+
+It exists because the counts answer a question the individual messages cannot. Six slots in the
+manifest could mean six properties a value can go in, or it could mean most composables are being
+skipped before they get that far — and those call for different responses.
+
+| | |
+|---|---|
+| `generated` | A Preview file was written |
+| `skipped` | No mock generator for a required parameter. Supportable later — see above |
+| `failed` | Reported as an error: `@Prev` on a non-`@Composable`, or on a composable a generated file cannot reach |
+
+The three always add up to what was found. Lists longer than ten are truncated.
+
+**A clean build says nothing.** KSP has no level between `info` and `warn`, so the summary is a
+warning only when something was skipped or failed; otherwise it is `info` and needs `--info`:
+
+```
+i: [ksp] [PrevHam] 43 @Prev found: 43 generated
+```
+
+A project with no `@Prev` at all hears nothing either way.
 
 ## What types aren't supported today?
 
@@ -173,6 +206,13 @@ There is no default endpoint, so nothing is called unless you name one. Everythi
 ordinary build — runs offline.
 
 ## How do I fix a skipped `@Prev`?
+
+The round summary names them and says why:
+
+```
+w: [ksp] [PrevHam] 45 @Prev found: 43 generated, 2 skipped:
+  FestivalCard: no mock generator available for parameter 'viewModel'
+```
 
 In rough order of preference:
 
