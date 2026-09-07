@@ -25,11 +25,21 @@ import kotlinx.coroutines.flow.asStateFlow
 //
 //     mockk<ScreenViewModel>(relaxed = true) {
 //         every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
+//         every { this@mockk.screenTitle } returns "2026 대동제"
+//         every { this@mockk.titleFor(any()) } returns "제 1회 대학 음악제"
 //     }
 //
-// Only `uiState` is stubbed. `titleFor` returns a String, which relaxed mode answers on its own -
-// stubbing members that don't need it is what made generation grow with the size of the dependency
-// graph (issue #75).
+// Two different reasons to stub, and both are needed:
+//
+//   * `uiState` *has* to be stubbed. It erases, so relaxed mode cannot answer it at all.
+//   * `screenTitle` and `titleFor` *may* be stubbed, and are here only because
+//     src/main/prevham/mock-values.json holds values for them (issue #103). Relaxed mode would answer
+//     a String on its own, just an empty one - which is what a Preview showed before.
+//
+// Everything else is left to relaxed mode. Stubbing members that need neither is what made
+// generation grow with the size of the dependency graph (issue #75), and a configured value does not
+// bring that back: its stub is a literal, so nothing recurses through it, and one is emitted only
+// where a person wrote a value.
 //
 // MockCastingTest in src/test asserts that the value this expression produces really does pass the
 // `is` checks below, rather than being another mock.
@@ -38,6 +48,8 @@ class ScreenViewModel : ViewModel() {
     private val internalUiState = MutableStateFlow<ScreenUiState>(ScreenUiState.Loading)
 
     val uiState: StateFlow<ScreenUiState> = internalUiState.asStateFlow()
+
+    val screenTitle: String = "대동제"
 
     fun titleFor(state: ScreenUiState): String = state.toString()
 }
@@ -49,7 +61,7 @@ fun StateHolderCard(viewModel: ScreenViewModel) {
     Text(
         text =
             when (state) {
-                is ScreenUiState.Loading -> "loading"
+                is ScreenUiState.Loading -> viewModel.screenTitle
                 is ScreenUiState.Success -> viewModel.titleFor(state)
                 is ScreenUiState.Error -> "error"
             },

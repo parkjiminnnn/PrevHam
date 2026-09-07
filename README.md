@@ -34,7 +34,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Collection support | Generates mock `List`, `Set`, `Map` values |
 | Enum support | Picks a valid mock value from enum constants |
 | Object support | References an `object`, `data object`, nested object or companion directly — the singleton itself, not a mock of it |
-| Mock values | Supply real-looking values for `String` and numeric slots from a committed file — written by hand, or filled in by a language model through a task that never runs during a build. Builds say which slots have none yet |
+| Mock values | Supply real-looking values for `String` and numeric slots from a committed file — on a constructed value or stubbed onto a mocked type's member — written by hand, or filled in by a language model through a task that never runs during a build. Builds say which slots have none yet |
 | Nested data classes | Recursive mock generation for nested data classes and collections, as deep as the model goes — bounded by cycle detection, not a depth limit |
 | Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
 | Sealed type support | Builds a real subtype (e.g. `UiState.Loading`) instead of mocking the sealed type |

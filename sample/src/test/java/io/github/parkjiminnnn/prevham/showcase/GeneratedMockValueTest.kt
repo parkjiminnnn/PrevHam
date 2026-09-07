@@ -34,6 +34,34 @@ class GeneratedMockValueTest {
     }
 
     @Test
+    fun `a configured value reaches the composable through the mock`() {
+        // Issue #103. A data class field is constructed, so a configured value flows through the
+        // generator that builds it; a member of a mocked type is reached only through
+        // `every { } returns`, and used to get nothing. Copied verbatim from StateHolderCardPreview.kt,
+        // where the value comes from sample/src/main/prevham/mock-values.json.
+        val viewModel =
+            mockk<ScreenViewModel>(relaxed = true) {
+                every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
+                every { this@mockk.screenTitle } returns "2026 대동제"
+                every { this@mockk.titleFor(any()) } returns "제 1회 대학 음악제"
+            }
+
+        assertEquals("2026 대동제", viewModel.screenTitle)
+        assertEquals("제 1회 대학 음악제", viewModel.titleFor(ScreenUiState.Loading))
+    }
+
+    @Test
+    fun `an unconfigured member is still answered by relaxed mode`() {
+        // What the stub above replaces, and what every member with no value still gets. Relaxed mode
+        // can answer a String on its own - stubbing members that do not need it is what made
+        // generation grow with the size of the dependency graph (issue #75).
+        val viewModel = mockk<ScreenViewModel>(relaxed = true)
+
+        assertEquals("", viewModel.screenTitle)
+        assertEquals("", viewModel.titleFor(ScreenUiState.Loading))
+    }
+
+    @Test
     fun `relaxed mode alone cannot produce a usable value for a generic member`() {
         // What PrevHam used to generate. StateFlow<T>.value erases to Object, so relaxed mode has
         // no type to work from and answers with a bare Object - which the caller's checkcast to

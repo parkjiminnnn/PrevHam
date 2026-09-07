@@ -41,7 +41,7 @@ internal class PrimitiveMockGenerator : MockGenerator {
 
     private fun KSType.qualifiedName(): String? = declaration.qualifiedName?.asString()
 
-    private companion object {
+    companion object {
         val MOCK_LITERALS =
             mapOf(
                 "kotlin.Int" to "1",
