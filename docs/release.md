@@ -23,6 +23,10 @@ document covers how to cut one and how the automation decides what to do.
 4. Open a follow-up PR bumping `VERSION_NAME` to the next `-SNAPSHOT` (e.g. `X.Y.(Z+1)-SNAPSHOT`)
    so ongoing work isn't labelled as the released version.
 
+`gradle.properties` is the only file carrying the number. The README's Quick Start writes
+`<version>` and leans on the Maven Central badge, which is generated from the repository and cannot
+go stale — so nothing else has to be edited per release, and nothing else should start to be.
+
 **The version bump PR is the release decision**, and the only place a human decides anything.
 Review it accordingly: once it reaches `main`, publication is automatic and Maven Central artifacts
 can never be deleted or overwritten.
