@@ -29,7 +29,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Gradle plugin | One plugin line declares runtime, compiler and MockK at a single version |
 | Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet |
 | Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. |
-| Data class mocks | Builds mock instances for flat data class parameters |
+| Constructor-based mocks | Builds a real instance of anything whose constructor can be called — data classes, plain classes, `value class` — instead of mocking it |
 | Nullable support | Uses a real mock when possible, falls back to `null` otherwise |
 | Collection support | Generates mock `List`, `Set`, `Map` values |
 | Enum support | Picks a valid mock value from enum constants |

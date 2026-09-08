@@ -12,7 +12,7 @@ import com.squareup.kotlinpoet.CodeBlock
  * that can ever exist. `toClassName()` carries the enclosing names, so a nested object and a
  * companion are written the way they are referenced - `Outer.Inner`, `Host.Companion`.
  *
- * Registered ahead of [DataClassMockGenerator] because a `data object` carries `Modifier.DATA` too.
+ * Registered ahead of [ConstructorMockGenerator] because a `data object` carries `Modifier.DATA` too.
  * That generator used to claim one and emit `Loading()`, which does not compile: an object has a
  * synthesised zero-parameter constructor, so its check that every constructor parameter can be
  * mocked was vacuously true (issue #77).

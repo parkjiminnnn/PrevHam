@@ -10,7 +10,7 @@ import org.junit.Test
 
 // An object is its own value: the reference is the whole answer, with no constructor to run and no
 // fields to invent. Nothing claimed ClassKind.OBJECT, so a Preview taking one was skipped - and a
-// data object was worse, claimed by DataClassMockGenerator on its DATA modifier and emitted as a
+// data object was worse, claimed by ConstructorMockGenerator on its DATA modifier and emitted as a
 // constructor call that doesn't compile (issue #77).
 @OptIn(ExperimentalCompilerApi::class)
 class ObjectMockGeneratorTest {
@@ -50,7 +50,7 @@ class ObjectMockGeneratorTest {
     @Test
     fun `references a data object rather than calling a constructor`() {
         // A data object carries Modifier.DATA and has a synthesised zero-parameter constructor, so
-        // DataClassMockGenerator's "every parameter can be mocked" was vacuously true and it emitted
+        // ConstructorMockGenerator's "every parameter can be mocked" was vacuously true and it emitted
         // Loading(). Compiling at all is the assertion.
         val generated = generate("Stated", "data object Loading", "state: Loading")
 

@@ -28,13 +28,13 @@ internal class MockGeneratorRegistry(
                     StringMockGenerator(),
                     EnumMockGenerator(),
                     // Alongside EnumMockGenerator: both reference a value that already exists rather
-                    // than building one. Ahead of DataClassMockGenerator, which claims a `data
+                    // than building one. Ahead of ConstructorMockGenerator, which claims a `data
                     // object` on its DATA modifier and emits an uncallable constructor.
                     ObjectMockGenerator(),
                     // Ahead of InterfaceMockGenerator, which would otherwise claim sealed
                     // interfaces and sealed classes as ordinary mockable types.
                     SealedTypeMockGenerator(),
-                    DataClassMockGenerator(),
+                    ConstructorMockGenerator(),
                     CollectionMockGenerator(),
                     FunctionTypeMockGenerator(),
                     InterfaceMockGenerator(),
