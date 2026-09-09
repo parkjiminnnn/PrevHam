@@ -103,13 +103,16 @@ fun UserCard(
 **Kotlin 2.2 or newer.** A newer Kotlin is fine; an older one cannot consume PrevHam at all — see
 [why](docs/faq.md#why-does-my-build-say-module-was-compiled-with-an-incompatible-version-of-kotlin).
 
+`<version>` below stands for the current release — the number on the Maven Central badge at the top
+of this page, which is generated from the repository itself and is never out of date.
+
 ### 1. Apply the plugins
 
 ```kotlin
 // build.gradle.kts
 plugins {
     id("com.google.devtools.ksp") version "2.2.10-2.0.2"
-    id("io.github.parkjiminnnn.prevham") version "1.2.0"
+    id("io.github.parkjiminnnn.prevham") version "<version>"
 }
 ```
 
@@ -130,8 +133,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.parkjiminnnn:prevham-runtime:1.2.0")
-    ksp("io.github.parkjiminnnn:prevham-compiler:1.2.0")
+    implementation("io.github.parkjiminnnn:prevham-runtime:<version>")
+    ksp("io.github.parkjiminnnn:prevham-compiler:<version>")
 
     // Required if any @Prev composable has an interface or non-data-class parameter
     // (e.g. Modifier) — PrevHam mocks those with MockK's mockk<T>(relaxed = true).
