@@ -12,6 +12,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Visibility
 import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
+import io.github.parkjiminnnn.compiler.mock.MissingValueReport
 import io.github.parkjiminnnn.compiler.mock.MockContext
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
 import io.github.parkjiminnnn.compiler.mock.MockValues
@@ -27,6 +28,7 @@ internal class PrevSymbolProcessor(
     private val logger: KSPLogger,
     private val mockValues: MockValues = MockValues.EMPTY,
     private val slotManifest: File? = null,
+    private val warnOnMissingValues: Boolean = false,
 ) : SymbolProcessor {
     private val mockGenerators = MockGeneratorRegistry.default()
 
@@ -34,22 +36,45 @@ internal class PrevSymbolProcessor(
     // round, and the manifest describes everything the compilation met.
     private val slots = SlotRecorder()
 
-    override fun process(resolver: Resolver): List<KSAnnotated> {
-        val symbols = resolver.getSymbolsWithAnnotation(PREV_ANNOTATION_NAME).toList()
-        logger.info("[PrevHam] found ${symbols.size} symbol(s) annotated with @Prev")
+    // Same reason, and the counts are only worth anything once they are complete: a per-round
+    // summary would split one project across several lines that each look like the whole picture.
+    private val tally = RoundTally()
 
-        symbols.filterIsInstance<KSFunctionDeclaration>().forEach(::processFunction)
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        resolver
+            .getSymbolsWithAnnotation(PREV_ANNOTATION_NAME)
+            .filterIsInstance<KSFunctionDeclaration>()
+            .forEach(::processFunction)
 
         return emptyList()
     }
 
     /**
-     * Writes the slot manifest, once every round has run.
+     * Reports on the round as a whole, once every round has run.
      *
-     * In finish() rather than process() because a slot found in a later round still belongs in the
-     * manifest, and a file rewritten per round would be incomplete until the last one.
+     * In finish() rather than process() because a slot found in a later round still counts: a
+     * manifest rewritten per round would be incomplete until the last one, and a warning raised per
+     * round would name slots that a later round goes on to decide.
      */
     override fun finish() {
+        writeSlotManifest()
+        warnAboutUndecidedSlots()
+        reportRound()
+    }
+
+    /**
+     * KSP calls this instead of finish() when the round reported an error.
+     *
+     * Only the summary is repeated here. The manifest and the missing-value warning describe a
+     * compilation that produced Previews, and this one did not - but the counts are exactly what
+     * says whether the error is one bad @Prev among forty working ones or the shape of the whole
+     * project.
+     */
+    override fun onError() {
+        reportRound()
+    }
+
+    private fun writeSlotManifest() {
         val file = slotManifest ?: return
         runCatching { SlotManifest.write(file, slots.recorded()) }
             .onFailure { failure ->
@@ -59,13 +84,47 @@ internal class PrevSymbolProcessor(
             }
     }
 
+    /**
+     * Says which slots the value file has nothing for.
+     *
+     * A warning rather than an error, and nothing is fetched to fix it. Falling back to the default
+     * is the correct behaviour for an undecided slot - the only thing missing is anyone being told,
+     * and telling them is the whole of this. A build that went and asked for the values instead
+     * would need credentials on every machine that compiles and would rewrite a committed file
+     * behind whoever ran it.
+     */
+    private fun warnAboutUndecidedSlots() {
+        if (!warnOnMissingValues) return
+        val undecided =
+            slots
+                .recorded()
+                .map { it.path }
+                .distinct()
+                .filter { mockValues[it] == null }
+        MissingValueReport.message(undecided)?.let(logger::warn)
+    }
+
+    /**
+     * Says what @Prev produced, and which ones it did not.
+     *
+     * Warned when something was skipped or failed and logged at info otherwise, because KSP has no
+     * level between the two: a build missing a third of its Previews is worth seeing by default, and
+     * a build that produced every one of them has nothing wrong with it to warn about.
+     */
+    private fun reportRound() {
+        val message = RoundReport.message(tally) ?: return
+        if (tally.hasProblems) logger.warn(message) else logger.info(message)
+    }
+
     private fun processFunction(function: KSFunctionDeclaration) {
+        tally.found()
         if (!function.isComposable()) {
             logger.error(
                 "[PrevHam] @Prev can only be applied to a @Composable function, " +
                     "but '${function.simpleName.asString()}' is not annotated with @Composable",
                 function,
             )
+            tally.failed()
             return
         }
 
@@ -76,6 +135,7 @@ internal class PrevSymbolProcessor(
                     "Alternatively, drop @Prev and write a @Preview function by hand in the same file.",
                 function,
             )
+            tally.failed()
             return
         }
 
@@ -90,6 +150,8 @@ internal class PrevSymbolProcessor(
                 fileName = fileSpec.name,
             ).bufferedWriter()
             .use { writer -> fileSpec.writeTo(writer) }
+        // Counted after the write, so the number says what is on disk rather than what was attempted.
+        tally.generated()
     }
 
     private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
@@ -97,10 +159,11 @@ internal class PrevSymbolProcessor(
         val context = MockContext.root(mockGenerators, mockValues, slots)
         val unsupported = firstUnsupportedParameter(parameters, context)
         if (unsupported != null) {
-            logger.warn(
-                "[PrevHam] skipping @Prev on '${function.simpleName.asString()}': " +
-                    "no mock generator available for parameter '${unsupported.name}'",
-                function,
+            // Recorded rather than warned about here. One warning per skip, scattered through a
+            // build's output, is easy to miss and impossible to count - RoundReport gathers them.
+            tally.skipped(
+                name = function.simpleName.asString(),
+                reason = "no mock generator available for parameter '${unsupported.name}'",
             )
             return null
         }

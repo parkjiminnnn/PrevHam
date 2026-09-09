@@ -136,8 +136,10 @@ class MockValueInjectionTest {
 
     @Test
     fun `warns and keeps generating when the file cannot be read`() {
-        // A typo in the path must not look like the values simply having no effect, and must not
-        // fail the round either.
+        // A file that is there but malformed must not look like the values simply having no effect,
+        // and must not fail the round either. A file that is merely absent is a different case and
+        // stays silent - see MissingValueWarningTest.
+        val malformed = folder.newFile("malformed.json").apply { writeText("{ not json") }
         val result =
             compilePrev(
                 SourceFile.kotlin(
@@ -154,7 +156,7 @@ class MockValueInjectionTest {
                     fun Missing(missing: Missing) {}
                     """,
                 ),
-                options = mapOf("prevham.mockValues" to "/nowhere/mock-values.json"),
+                options = mapOf("prevham.mockValues" to malformed.absolutePath),
             )
 
         assertEquals(result.messages, KotlinCompilation.ExitCode.OK, result.exitCode)

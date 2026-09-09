@@ -9,7 +9,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.parkjiminnnn/prevham-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/io.github.parkjiminnnn)
 [![CI](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml/badge.svg)](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.2.10-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.2%2B-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
 [![KSP](https://img.shields.io/badge/KSP-2.2.10--2.0.2-purple.svg)](https://github.com/google/ksp)
 
 [Why PrevHam?](#-why-prevham) •
@@ -29,15 +29,16 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Gradle plugin | One plugin line declares runtime, compiler and MockK at a single version |
 | Automatic Preview generation | Generates a `@Preview @Composable` wrapper function via KotlinPoet |
 | Primitive & String mocks | Auto-generates mock values for `Int`, `String`, `Boolean`, etc. |
-| Data class mocks | Builds mock instances for flat data class parameters |
+| Constructor-based mocks | Builds a real instance of anything whose constructor can be called — data classes, plain classes, `value class` — instead of mocking it |
 | Nullable support | Uses a real mock when possible, falls back to `null` otherwise |
 | Collection support | Generates mock `List`, `Set`, `Map` values |
 | Enum support | Picks a valid mock value from enum constants |
 | Object support | References an `object`, `data object`, nested object or companion directly — the singleton itself, not a mock of it |
-| Mock values | Supply real-looking values for `String` and numeric slots from a committed file — written by hand, or filled in by a language model through a task that never runs during a build |
+| Mock values | Supply real-looking values for `String` and numeric slots from a committed file — on a constructed value or stubbed onto a mocked type's member — written by hand, or filled in by a language model through a task that never runs during a build. Builds say which slots have none yet |
 | Nested data classes | Recursive mock generation for nested data classes and collections, as deep as the model goes — bounded by cycle detection, not a depth limit |
 | Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
 | Sealed type support | Builds a real subtype (e.g. `UiState.Loading`) instead of mocking the sealed type |
+| Round summary | One line at the end of a build saying how many `@Prev` were found, generated and skipped, with the skipped ones and their reason under it |
 | Mock member stubbing | Stubs the members MockK's relaxed mode can't answer — those whose type erases, such as `StateFlow`/`Flow` — and leaves the rest to relaxed mode, so a mock stays as small as the Preview needs |
 | Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
 | Generic type support | Resolves type arguments for generic data classes and interfaces (e.g. `Box<String>`, `Repository<String>`) |
@@ -97,19 +98,29 @@ fun UserCard(
 
 > Published versions are listed on [Maven Central](https://central.sonatype.com/namespace/io.github.parkjiminnnn).
 
+### Requirements
+
+**Kotlin 2.2 or newer.** A newer Kotlin is fine; an older one cannot consume PrevHam at all — see
+[why](docs/faq.md#why-does-my-build-say-module-was-compiled-with-an-incompatible-version-of-kotlin).
+
+`<version>` below stands for the current release — the number on the Maven Central badge at the top
+of this page, which is generated from the repository itself and is never out of date.
+
 ### 1. Apply the plugins
 
 ```kotlin
 // build.gradle.kts
 plugins {
     id("com.google.devtools.ksp") version "2.2.10-2.0.2"
-    id("io.github.parkjiminnnn.prevham") version "1.2.0"
+    id("io.github.parkjiminnnn.prevham") version "<version>"
 }
 ```
 
 That's the whole setup — the PrevHam plugin declares `prevham-runtime`, `prevham-compiler` and MockK for you, all at its own version, so they can't drift apart.
 
-The KSP version is yours to pick, and deliberately so: a KSP version is tied to a Kotlin version, and pinning it here would pin your Kotlin version to PrevHam's. Use the one matching your Kotlin.
+The KSP version is yours to pick, and deliberately so. A KSP version is tied to a Kotlin version, so applying KSP here would stop you moving to a newer Kotlin until PrevHam released against it. Use the one matching your Kotlin.
+
+That keeps the ceiling open, not the floor: `prevham-runtime` is compiled Kotlin, so 2.2 is still the minimum whatever KSP you pick.
 
 <details>
 <summary>Declaring the dependencies by hand instead</summary>
@@ -122,8 +133,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.parkjiminnnn:prevham-runtime:1.2.0")
-    ksp("io.github.parkjiminnnn:prevham-compiler:1.2.0")
+    implementation("io.github.parkjiminnnn:prevham-runtime:<version>")
+    ksp("io.github.parkjiminnnn:prevham-compiler:<version>")
 
     // Required if any @Prev composable has an interface or non-data-class parameter
     // (e.g. Modifier) — PrevHam mocks those with MockK's mockk<T>(relaxed = true).
@@ -287,6 +298,17 @@ prevham {
 **Builds never call the model.** Values are generated once, committed, and read from the file
 afterwards — so teammates and CI need no key, offline builds work, and a value that comes back wrong
 can be corrected by hand and stays corrected.
+
+A build does say when the file has fallen behind the code, so a property added later does not sit on
+its default unnoticed:
+
+```
+w: [ksp] [PrevHam] 1 slot(s) have no mock value:
+  com.example.app.Festival.slogan
+
+Run ./gradlew prevhamGenerateMockValues to fill them in.
+Set warnOnMissingValues = false in the prevham { } block to stop hearing about it.
+```
 
 > Everything about this — the endpoint, where the key goes, what can take a value, and what happens
 > when any of it fails — is in [`docs/mock-values.md`](docs/mock-values.md).

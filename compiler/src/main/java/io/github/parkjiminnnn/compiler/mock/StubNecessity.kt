@@ -58,20 +58,6 @@ internal class StubNecessity {
     }
 
     /**
-     * Whether a type is declared in the sources being compiled, rather than a compiled dependency.
-     *
-     * The search stops at anything else. Walking into the platform finds erased members everywhere -
-     * `Throwable` exposes `Array<StackTraceElement>`, whose `get` returns a type parameter - so
-     * practically every type would be marked as needing a stub, which is the state generation
-     * exploded from in issue #75.
-     *
-     * The cost is that a type from another module or a library isn't searched through, so an erased
-     * member behind one isn't found. `Flow` is unaffected, being recognised directly rather than by
-     * searching.
-     */
-    private fun KSClassDeclaration.isFromSource(): Boolean = origin == Origin.KOTLIN || origin == Origin.JAVA
-
-    /**
      * A type that becomes a literal rather than a mock, so nothing is read out of it through one.
      *
      * The search has to stop at these. The standard library is full of generic members - walk into
@@ -150,3 +136,21 @@ internal fun KSFunctionDeclaration.isStubbable(): Boolean {
     // no concrete type to build a value for.
     return typeParameters.isEmpty()
 }
+
+/**
+ * Whether a type is declared in the sources being compiled, rather than a compiled dependency.
+ *
+ * [StubNecessity]'s search stops at anything else. Walking into the platform finds erased members
+ * everywhere - `Throwable` exposes `Array<StackTraceElement>`, whose `get` returns a type parameter -
+ * so practically every type would be marked as needing a stub, which is the state generation exploded
+ * from in issue #75.
+ *
+ * The cost is that a type from another module or a library isn't searched through, so an erased
+ * member behind one isn't found. `Flow` is unaffected, being recognised directly rather than by
+ * searching.
+ *
+ * The same gate decides which members can take a configured value, for the same reason on a different
+ * axis: opening `java.time.LocalDate` would put its 56 stubbable members in the slot manifest and ask
+ * a model about every one of them.
+ */
+internal fun KSClassDeclaration.isFromSource(): Boolean = origin == Origin.KOTLIN || origin == Origin.JAVA

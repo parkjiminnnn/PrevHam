@@ -64,6 +64,14 @@ internal class MockContext private constructor(
         slot?.let(slotRecorder::record)
     }
 
+    /**
+     * Whether a value is configured for [slot] - asked about a slot this context is not on.
+     *
+     * A member of a mocked type is stubbed only when someone has decided what it should say, and
+     * that has to be known before the stub is built rather than read back off a generated literal.
+     */
+    fun hasValueFor(slot: MockSlot): Boolean = values[slot.path] != null
+
     /** Whether an inner type can be mocked from here, without expanding it. */
     fun canMock(
         type: KSType,

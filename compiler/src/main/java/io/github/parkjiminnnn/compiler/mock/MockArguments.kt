@@ -31,7 +31,7 @@ internal fun KSValueParameter.toMockParameter(
     return MockParameter(name, type, hasDefault, slot)
 }
 
-// Shared by the processor, for a @Prev function's own parameters, and by DataClassMockGenerator,
+// Shared by the processor, for a @Prev function's own parameters, and by ConstructorMockGenerator,
 // for a constructor's. Both descend through the context, so a parameter list nested inside another
 // type is bounded by the same path the rest of the recursion is.
 internal fun firstUnsupportedParameter(

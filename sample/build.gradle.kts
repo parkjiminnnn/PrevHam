@@ -59,3 +59,14 @@ dependencies {
 ksp {
     arg("prevham.slotManifest", "${layout.buildDirectory.get()}/generated/prevham/mock-value-slots.json")
 }
+
+// A committed value file, so the sample shows what a configured value does to a Preview. Only the
+// state-holder slots are filled: the point is the shape, not a complete set of values.
+//
+// The missing-value warning is off for that reason. It exists to tell a project its file has fallen
+// behind its code, and here the gaps are deliberate - a build that always warns teaches people to
+// stop reading warnings.
+ksp {
+    arg("prevham.mockValues", "$projectDir/src/main/prevham/mock-values.json")
+    arg("prevham.warnOnMissingValues", "false")
+}

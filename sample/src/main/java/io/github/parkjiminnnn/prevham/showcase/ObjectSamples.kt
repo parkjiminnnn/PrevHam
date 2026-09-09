@@ -6,7 +6,7 @@ import io.github.parkjiminnnn.runtime.Prev
 
 // An object is its own value - one instance, no constructor to run, no fields to invent - so the
 // reference is the whole answer. Before issue #77 nothing claimed ClassKind.OBJECT, so a Preview
-// taking one was skipped entirely, and a `data object` was worse: DataClassMockGenerator claimed it
+// taking one was skipped entirely, and a `data object` was worse: ConstructorMockGenerator claimed it
 // on its DATA modifier and emitted `Loading()`, which doesn't compile.
 //
 // toClassName() carries the enclosing names, so a nested object and a companion are written the way

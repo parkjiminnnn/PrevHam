@@ -23,8 +23,8 @@ the same type.
 | `StringMockGenerator` | `String` | `"mock"` |
 | `EnumMockGenerator` | Enum classes | `Status.ACTIVE` (first declared entry) |
 | `SealedTypeMockGenerator` | Sealed interfaces and sealed classes | `UiState.Loading` |
-| `InterfaceMockGenerator` | Interfaces, and non-data classes not owned by another generator | `mockk<ImageLoader>(relaxed = true)`, with stubs only for members relaxed mode can't answer |
-| `DataClassMockGenerator` | Data classes | `User(id = 1, name = "mock", age = 1)` |
+| `InterfaceMockGenerator` | Interfaces, abstract classes, and anything with no reachable constructor | `mockk<ImageLoader>(relaxed = true)`, with stubs only for members relaxed mode can't answer |
+| `ConstructorMockGenerator` | Anything whose constructor can be called — data classes, plain classes, `value class` | `User(id = 1, name = "mock", age = 1)` |
 | `CollectionMockGenerator` | `List`, `Set`, `Map` | `listOf(1)`, `mapOf("mock" to 1)` |
 | `FunctionTypeMockGenerator` | `() -> R` and other `kotlin.FunctionN` types | `{ }`, `{ 1 }` |
 | `NullableFallbackMockGenerator` | Any nullable type no other generator supports | `null` |
@@ -47,10 +47,10 @@ real design constraint, not cosmetic:
 
 - **Generators that terminate immediately come first.** `Primitive`, `String`, and `Enum` never call
   back into the registry, so checking them first keeps the common case cheap.
-- **`Object` must precede `DataClass`.** A `data object` carries `Modifier.DATA` too, and it has a
-  synthesised zero-parameter constructor — so `DataClassMockGenerator`'s "every constructor parameter
+- **`Object` must precede `Constructor`.** A `data object` carries `Modifier.DATA` too, and it has a
+  synthesised zero-parameter constructor — so `ConstructorMockGenerator`'s "every constructor parameter
   can be mocked" was vacuously true and it emitted `Loading()`, which doesn't compile. Ordering fixes
-  it; `DataClassMockGenerator` also checks `classKind == CLASS`, so reordering the registry can't
+  it; `ConstructorMockGenerator` also checks `classKind == CLASS`, so reordering the registry can't
   bring it back (issue #77).
 - **`SealedType` must precede `Interface`.** A sealed interface is still an interface, and a sealed
   class is still a non-data class, so `InterfaceMockGenerator` would claim both and hand them to
@@ -68,7 +68,7 @@ real design constraint, not cosmetic:
 
 ## Bounding recursion: cycle detection, not depth
 
-`DataClassMockGenerator`, `CollectionMockGenerator`, `FunctionTypeMockGenerator`, and
+`ConstructorMockGenerator`, `CollectionMockGenerator`, `FunctionTypeMockGenerator`, and
 `InterfaceMockGenerator`'s member stubbing are all *recursive* — mocking a
 `data class Order(val address: Address)` requires mocking `Address` too, which might itself contain
 further nested types. Left unchecked, a self-referential type (`data class Node(val next: Node)`)
@@ -192,8 +192,11 @@ where a slot is created. The manifest then lists the places a value would actual
 than every parameter walked past on the way. Recording happens while generating and never while
 deciding, so `canMock` stays free of side effects — the same rule the stub budget follows.
 
-A member of a mocked type has no slot: it is reached by mocking rather than construction, so it never
-passes a leaf generator. See [#103](https://github.com/parkjiminnnn/PrevHam/issues/103).
+A member of a mocked type is reached by mocking rather than construction, so it never arrives at a
+leaf generator on its own. `InterfaceMockGenerator` sends it to one anyway - that is what records the
+slot - and keeps the result only when a value was configured for it, emitting
+`every { this@mockk.title } returns "…"`. A member with no value is left to relaxed mode, so the stub
+count stays a sum bounded by a curated file rather than a product of the graph.
 
 The file itself, where it comes from and what happens when it is wrong: [mock-values.md](mock-values.md).
 
@@ -211,7 +214,7 @@ internal fun KSValueParameter.toMockParameter(type: KSType = this.type.resolve()
 Every consumer of the mock pipeline (`buildMockArguments`, `firstUnsupportedParameter`, each
 `MockGenerator`) operates on `MockParameter`, not directly on `KSValueParameter`. The default
 `type: KSType = this.type.resolve()` covers the ordinary case (a top-level function parameter, whose
-type is fully known from its own declaration), while `DataClassMockGenerator` overrides it with an
+type is fully known from its own declaration), while `ConstructorMockGenerator` overrides it with an
 `asMemberOf`-substituted type for constructor parameters of a generic data class — see
 [ksp-processing.md](ksp-processing.md#generic-type-resolution-resolve-vs-asmemberof) for why plain
 `resolve()` can't produce a correct type there. Parameters with a default value (`hasDefault`) are
@@ -219,11 +222,24 @@ allowed to be skipped when unsupported, since the generated call can simply omit
 
 ## Generator walkthroughs
 
-**`DataClassMockGenerator`** requires the `Modifier.DATA` modifier (interfaces and plain classes are
-explicitly out of scope here — they're `InterfaceMockGenerator`'s job) and a primary constructor. It
-recurses into each constructor parameter through the context, then emits a named-argument
-constructor call built by the shared `buildNamedArgumentsCall` helper (also used for the generated
-Preview function's own call to the original composable).
+**`ConstructorMockGenerator`** asks whether the constructor can be called, not whether the class is a
+`data` class. It needs a `ClassKind.CLASS` that is not abstract, sealed or inner, and a primary
+constructor the generated file could reach — `public`, or `internal` when the declaration is part of
+the compilation being processed, since another module's `internal` would not compile. It then recurses
+into each constructor parameter through the context and emits a named-argument constructor call built
+by the shared `buildNamedArgumentsCall` helper (also used for the generated Preview function's own
+call to the original composable).
+
+The `data` keyword changes nothing about whether a value can be built, and gating on it left an
+ordinary class mocked for no reason (issue #78). Measured after #75 narrowed member stubbing, the cost
+was not output size — a mocked plain class was already one line — but the values in it: a mock answers
+through relaxed mode, which invents `""` and `0`, while a constructed instance carries PrevHam's own
+defaults and whatever the value file says.
+
+Running an arbitrary constructor at render time is a real risk, and not a new one: a data class may
+carry the same `init` block and has always been constructed. The arguments are inert — literals, or
+relaxed mocks that absorb calls made on them — so what is left is a class that rejects its own mock
+arguments, failing visibly at render rather than silently.
 
 **`SealedTypeMockGenerator`** builds a real instance of one of a sealed type's concrete subtypes
 instead of handing the sealed type to MockK. MockK *can* produce a value for a sealed type — it
