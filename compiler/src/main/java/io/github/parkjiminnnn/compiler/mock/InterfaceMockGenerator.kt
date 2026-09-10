@@ -50,8 +50,7 @@ internal class InterfaceMockGenerator : MockGenerator {
         context: MockContext,
     ): CodeBlock {
         val declaration = type.declaration as KSClassDeclaration
-        val rawClassName = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
-        declaration.selfImplementingCompanionMock(rawClassName)?.let { return it }
+        declaration.selfImplementingCompanionMock(declaration.toClassName())?.let { return it }
 
         val mockCall = CodeBlock.of("%M<%T>(relaxed = true)", MOCKK_FUNCTION, type.toTypeName())
         val stubs = declaration.memberStubs(type, context)
@@ -243,9 +242,14 @@ internal class InterfaceMockGenerator : MockGenerator {
     // Repository<String>). Returns null for anything we can't fully resolve (e.g. a star
     // projection like Repository<*>), so that case stays unsupported rather than emitting broken
     // code.
+    //
+    // Through toClassName() rather than packageName plus simpleName, which drops every enclosing
+    // declaration: a nested Screen.Listener came out as mockk<Listener>, which does not resolve, and
+    // since this recurses into type arguments a nested data class did too once it sat inside a
+    // generic - mockk<Repository<Item>> for Repository<Screen.Item> (issue #118).
     private fun KSType.toTypeName(): TypeName? {
         val declaration = declaration as? KSClassDeclaration ?: return null
-        val className = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
+        val className = declaration.toClassName()
         if (arguments.isEmpty()) return className
         val typeArgumentNames =
             arguments.map { argument -> argument.type?.resolve()?.toTypeName() ?: return null }
