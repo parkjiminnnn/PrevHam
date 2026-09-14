@@ -3,7 +3,6 @@ package io.github.parkjiminnnn.compiler.mock
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 
 internal class EnumMockGenerator : MockGenerator {
@@ -17,8 +16,7 @@ internal class EnumMockGenerator : MockGenerator {
         context: MockContext,
     ): CodeBlock {
         val declaration = type.declaration as KSClassDeclaration
-        val className = ClassName(declaration.packageName.asString(), declaration.simpleName.asString())
-        return CodeBlock.of("%T.%L", className, type.firstEnumEntryName())
+        return CodeBlock.of("%T.%L", declaration.toClassName(), type.firstEnumEntryName())
     }
 
     private fun KSType.firstEnumEntryName(): String? {

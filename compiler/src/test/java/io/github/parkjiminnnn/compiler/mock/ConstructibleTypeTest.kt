@@ -103,34 +103,17 @@ class ConstructibleTypeTest {
     fun `mocks an inner class`() {
         // An inner class needs an enclosing instance the generated file has no way to produce, so it
         // must not be constructed.
-        //
-        // Asserted on the generated text rather than through generate(), which requires the output
-        // to compile - and this output does not, for a reason that predates this change and is
-        // unrelated to it: InterfaceMockGenerator builds its type name from packageName plus
-        // simpleName, so a nested type is emitted as `mockk<Inner>` rather than `mockk<Outer.Inner>`.
-        // Verified to fail the same way on develop.
-        val result =
-            compilePrev(
-                SourceFile.kotlin(
-                    "Inner.kt",
-                    """
-                    package test
-                    import androidx.compose.runtime.Composable
-                    import io.github.parkjiminnnn.runtime.Prev
-
-                    class Outer {
-                        inner class Inner(val x: String)
-                    }
-
-                    @Prev
-                    @Composable
-                    fun InnerCard(inner: Outer.Inner) {}
-                    """,
-                ),
+        val generated =
+            generate(
+                """
+                class Outer {
+                    inner class Inner(val x: String)
+                }
+                """,
+                "inner: Outer.Inner",
             )
 
-        val generated = requireNotNull(result.generatedFile("InnerCardPreview.kt")) { result.messages }
-        assertTrue(generated, generated.contains("relaxed = true"))
+        assertTrue(generated, generated.contains("mockk<Outer.Inner>(relaxed = true)"))
     }
 
     @Test

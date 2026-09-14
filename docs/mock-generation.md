@@ -200,6 +200,30 @@ count stays a sum bounded by a curated file rather than a product of the graph.
 
 The file itself, where it comes from and what happens when it is wrong: [mock-values.md](mock-values.md).
 
+## Naming a declaration: through its enclosing classes
+
+A type declared inside another class has to be written through its enclosing classes —
+`LineupScreen.Tab`, not `Tab`. Every generator that names a declaration goes through
+`KSClassDeclaration.toClassName()` in `ClassNames.kt`, which walks `parentDeclaration` and hands
+KotlinPoet the whole chain:
+
+```kotlin
+tab = LineupScreen.Tab.LINEUP
+listener = mockk<LineupScreen.Listener>(relaxed = true)
+repository = mockk<Repository<Screen.Item>>(relaxed = true)
+```
+
+Building `ClassName(packageName, simpleName)` directly looks equivalent and is not: it compiles only for
+top-level types. Three places did that until issue #118 — `EnumMockGenerator`, and in
+`InterfaceMockGenerator` both the `mockk<…>` type and the self-implementing companion reference — so a
+nested enum, interface, abstract class or inner class produced a name that did not resolve. Because
+`InterfaceMockGenerator` recurses into type arguments with the same builder, a nested data class was
+broken too once it sat inside a generic, even though it was named correctly as a parameter.
+
+The cost of getting this wrong is higher than for most generator bugs. A generated file is compiled with
+the app, so a name that does not resolve stops the consumer's whole build — with an error that points
+into `build/generated` rather than at anything they wrote.
+
 ## `MockParameter`: decoupling "what to mock" from "how its type was found"
 
 ```kotlin
