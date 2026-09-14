@@ -1,5 +1,6 @@
 package io.github.parkjiminnnn.compiler.mock
 
+import com.google.devtools.ksp.getAllSuperTypes
 import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -56,6 +57,8 @@ import io.github.parkjiminnnn.compiler.codegen.buildNamedArgumentsCall
  * arguments, and it fails visibly at render rather than silently.
  */
 internal class ConstructorMockGenerator : MockGenerator {
+    private val viewModels = mutableMapOf<String, Boolean>()
+
     override fun supports(
         type: KSType,
         context: MockContext,
@@ -86,6 +89,8 @@ internal class ConstructorMockGenerator : MockGenerator {
             declaration.primaryConstructor
                 ?.takeIf { it.parameters.isNotEmpty() }
                 ?.takeIf { it.isCallableFromGeneratedFile(declaration) } ?: return null
+        // Asked last of the four, because everything above it reads a field and this resolves types.
+        if (declaration.isViewModel()) return null
         // asMemberOf() rejects a nullable containing type outright ("Item? is not a sub type of
         // the class/interface that contains <init>"), which would fail the whole KSP round rather
         // than this one type. A nullable class should still get a real instance where one can be
@@ -130,7 +135,41 @@ internal class ConstructorMockGenerator : MockGenerator {
             else -> false
         }
 
+    /**
+     * Whether this is a ViewModel, which is never constructed however callable its constructor is.
+     *
+     * Constructing one was a regression (issue #119). Its parameters are dependencies rather than
+     * data, so nothing is gained - what goes in is a relaxed mock and what comes out is whatever the
+     * ViewModel computes from one - and everything built for the shape is lost: the erased-member
+     * stub that keeps `uiState` from throwing (#59) and any configured value for its members (#103)
+     * both reach a mock and only a mock. Its `init` and its superclass constructor also run while a
+     * Preview renders.
+     *
+     * The parameter count cannot separate the two cases. A ViewModel without parameters was already
+     * left alone, and that was mistaken for the rule - but the test fixtures happened to have none
+     * while a real one, receiving its dependencies through the constructor, always does.
+     *
+     * Matched by name, which this codebase otherwise avoids. ViewModel is the shape PrevHam generates
+     * Previews for rather than an incidental type, and the alternative - declining every class that
+     * extends a class - both misses what it should catch (a repository implementing an interface) and
+     * catches what it should not (a value holder with a base class, and every sealed subtype).
+     */
+    private fun KSClassDeclaration.isViewModel(): Boolean {
+        val name = qualifiedName?.asString() ?: return false
+        // getAllSuperTypes() resolves types, which KSP's own documentation calls expensive, and
+        // supports() is asked about every candidate. Keyed on the name because the answer belongs to
+        // the declaration, not to the path it was reached from - the same reason StubNecessity caches.
+        return viewModels.getOrPut(name) {
+            name == VIEW_MODEL_QUALIFIED_NAME ||
+                getAllSuperTypes().any { it.declaration.qualifiedName?.asString() == VIEW_MODEL_QUALIFIED_NAME }
+        }
+    }
+
     private companion object {
         val NON_CONSTRUCTIBLE_MODIFIERS = listOf(Modifier.ABSTRACT, Modifier.SEALED, Modifier.INNER)
+
+        // Covers AndroidViewModel and a project's own BaseViewModel too, since the whole supertype
+        // chain is searched rather than the immediate one.
+        const val VIEW_MODEL_QUALIFIED_NAME = "androidx.lifecycle.ViewModel"
     }
 }

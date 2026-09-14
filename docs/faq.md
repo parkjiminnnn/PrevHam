@@ -133,6 +133,10 @@ A long chain of interfaces is no longer one of these. `Outer.middle` → `Middle
 out, which put this crash back within reach; nothing there revisits a type, so it is now stubbed all
 the way down (issue #60).
 
+A ViewModel is always mocked rather than constructed, whether or not its constructor takes parameters,
+so these stubs reach it however it is written. v1.3.0 briefly constructed one that took dependencies,
+which removed them; fixed in v1.3.1 (issue #119).
+
 Extracting a stateless composable that takes the resolved state directly, and putting `@Prev` on that,
 avoids all of it — and is the better Compose shape regardless.
 
