@@ -200,6 +200,30 @@ count stays a sum bounded by a curated file rather than a product of the graph.
 
 The file itself, where it comes from and what happens when it is wrong: [mock-values.md](mock-values.md).
 
+## Naming a declaration: through its enclosing classes
+
+A type declared inside another class has to be written through its enclosing classes —
+`LineupScreen.Tab`, not `Tab`. Every generator that names a declaration goes through
+`KSClassDeclaration.toClassName()` in `ClassNames.kt`, which walks `parentDeclaration` and hands
+KotlinPoet the whole chain:
+
+```kotlin
+tab = LineupScreen.Tab.LINEUP
+listener = mockk<LineupScreen.Listener>(relaxed = true)
+repository = mockk<Repository<Screen.Item>>(relaxed = true)
+```
+
+Building `ClassName(packageName, simpleName)` directly looks equivalent and is not: it compiles only for
+top-level types. Three places did that until issue #118 — `EnumMockGenerator`, and in
+`InterfaceMockGenerator` both the `mockk<…>` type and the self-implementing companion reference — so a
+nested enum, interface, abstract class or inner class produced a name that did not resolve. Because
+`InterfaceMockGenerator` recurses into type arguments with the same builder, a nested data class was
+broken too once it sat inside a generic, even though it was named correctly as a parameter.
+
+The cost of getting this wrong is higher than for most generator bugs. A generated file is compiled with
+the app, so a name that does not resolve stops the consumer's whole build — with an error that points
+into `build/generated` rather than at anything they wrote.
+
 ## `MockParameter`: decoupling "what to mock" from "how its type was found"
 
 ```kotlin
@@ -223,9 +247,10 @@ allowed to be skipped when unsupported, since the generated call can simply omit
 ## Generator walkthroughs
 
 **`ConstructorMockGenerator`** asks whether the constructor can be called, not whether the class is a
-`data` class. It needs a `ClassKind.CLASS` that is not abstract, sealed or inner, and a primary
+`data` class. It needs a `ClassKind.CLASS` that is not abstract, sealed or inner, a primary
 constructor the generated file could reach — `public`, or `internal` when the declaration is part of
-the compilation being processed, since another module's `internal` would not compile. It then recurses
+the compilation being processed, since another module's `internal` would not compile — and at least one
+parameter. It then recurses
 into each constructor parameter through the context and emits a named-argument constructor call built
 by the shared `buildNamedArgumentsCall` helper (also used for the generated Preview function's own
 call to the original composable).
@@ -240,6 +265,26 @@ Running an arbitrary constructor at render time is a real risk, and not a new on
 carry the same `init` block and has always been constructed. The arguments are inert — literals, or
 relaxed mocks that absorb calls made on them — so what is left is a class that rejects its own mock
 arguments, failing visibly at render rather than silently.
+
+### Two shapes that are never constructed
+
+**A constructor with no parameters.** Construction is worth doing because it puts values in, and with
+no parameters there are none — so it carries exactly what a mock does while additionally running
+whatever the class does.
+
+**A ViewModel**, matched by `androidx.lifecycle.ViewModel` anywhere in its supertype chain, so
+`AndroidViewModel` and a project's own `BaseViewModel` are covered. Its parameters are dependencies
+rather than data: what goes in is a relaxed mock and what comes out is whatever the ViewModel computes
+from one. Everything built for the shape reaches a mock and only a mock — the erased-member stub that
+keeps `uiState` from throwing, and any configured value for its members — so constructing one dropped
+both (issue #119).
+
+The parameter count cannot separate the two cases on its own. A ViewModel without parameters was
+already left alone, and that was briefly mistaken for the rule, but a ViewModel receiving its
+dependencies through the constructor always has some. Matching a name is something this file otherwise
+argues against; ViewModel is the shape PrevHam generates Previews for rather than an incidental type,
+and the structural alternative — declining every class that extends a class — misses a repository that
+implements an interface while taking every sealed subtype with it.
 
 **`SealedTypeMockGenerator`** builds a real instance of one of a sealed type's concrete subtypes
 instead of handing the sealed type to MockK. MockK *can* produce a value for a sealed type — it

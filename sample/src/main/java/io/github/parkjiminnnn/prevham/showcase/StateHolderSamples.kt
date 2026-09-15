@@ -67,3 +67,44 @@ fun StateHolderCard(viewModel: ScreenViewModel) {
             },
     )
 }
+
+// The same shape with dependencies, which is how a ViewModel usually arrives in an app - Hilt or
+// any other DI hands it a repository through the constructor.
+//
+// PrevHam constructs anything whose constructor can be called (issue #78), and this one's is
+// callable, so v1.3.0 built it for real and dropped everything above: no uiState stub, no configured
+// value, and its init running while the Preview rendered. Constructing it gains nothing either, since
+// the repository going in is itself a mock. A ViewModel is now never constructed (issue #119):
+//
+//     viewModel = mockk<FestivalViewModel>(relaxed = true) {
+//         every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
+//         every { this@mockk.festivalName } returns "2026 대동제"
+//     }
+
+interface FestivalRepository {
+    fun festivalName(): String
+}
+
+class FestivalViewModel(
+    private val repository: FestivalRepository,
+) : ViewModel() {
+    private val internalUiState = MutableStateFlow<ScreenUiState>(ScreenUiState.Loading)
+
+    val uiState: StateFlow<ScreenUiState> = internalUiState.asStateFlow()
+
+    val festivalName: String get() = repository.festivalName()
+}
+
+@Prev
+@Composable
+fun FestivalHeader(viewModel: FestivalViewModel) {
+    val state by viewModel.uiState.collectAsState()
+    Text(
+        text =
+            when (state) {
+                is ScreenUiState.Loading -> viewModel.festivalName
+                is ScreenUiState.Success -> viewModel.festivalName
+                is ScreenUiState.Error -> "error"
+            },
+    )
+}

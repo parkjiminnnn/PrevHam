@@ -51,6 +51,21 @@ class GeneratedMockValueTest {
     }
 
     @Test
+    fun `a ViewModel taking dependencies is still reached by its stubs`() {
+        // Issue #119. Its constructor is callable, so v1.3.0 built it for real - and a constructed
+        // ViewModel has no stubs, so the uiState fix from #59 and the configured value both vanished.
+        // Copied verbatim from FestivalHeaderPreview.kt.
+        val viewModel =
+            mockk<FestivalViewModel>(relaxed = true) {
+                every { this@mockk.uiState } returns MutableStateFlow(ScreenUiState.Loading)
+                every { this@mockk.festivalName } returns "2026 대동제"
+            }
+
+        assertSame(ScreenUiState.Loading, viewModel.uiState.value)
+        assertEquals("2026 대동제", viewModel.festivalName)
+    }
+
+    @Test
     fun `an unconfigured member is still answered by relaxed mode`() {
         // What the stub above replaces, and what every member with no value still gets. Relaxed mode
         // can answer a String on its own - stubbing members that do not need it is what made
