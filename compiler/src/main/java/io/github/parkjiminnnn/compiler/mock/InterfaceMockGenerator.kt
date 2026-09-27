@@ -97,7 +97,7 @@ internal class InterfaceMockGenerator : MockGenerator {
                         it,
                     )
                 }
-                if (!stubNecessity.isNeededFor(declaredType)) return@mapNotNull null
+                if (!stubNecessity.isNeededFor(declaredType, property.declaredOnSource())) return@mapNotNull null
                 if (!context.canAffordStub()) return@mapNotNull null
                 // asMemberOf rejects a nullable containing type outright ("Logger? is not a sub
                 // type of the class/interface that contains `name`"), and the exception would fail
@@ -130,7 +130,7 @@ internal class InterfaceMockGenerator : MockGenerator {
                         it,
                     )
                 }
-                if (!stubNecessity.isNeededFor(declaredReturn)) return@mapNotNull null
+                if (!stubNecessity.isNeededFor(declaredReturn, function.declaredOnSource())) return@mapNotNull null
                 if (!context.canAffordStub()) return@mapNotNull null
                 val returnType = function.asMemberOf(containing.makeNotNullable()).returnType ?: return@mapNotNull null
                 val value = context.stubValue(returnType) ?: return@mapNotNull null

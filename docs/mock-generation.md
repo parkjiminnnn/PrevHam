@@ -370,8 +370,40 @@ Two boundaries keep that search honest, both learned by measuring:
   as needing a stub.
 - **It stops at compiled dependencies.** `Throwable` reaches an erased member through
   `Array<StackTraceElement>.get`, and following that marks practically every type as needing a stub —
-  the state generation exploded from in issue #75. The cost is that an erased member behind a library
-  type isn't found; `Flow` is unaffected, being recognised directly rather than by searching.
+  the state generation exploded from in issue #75. `Flow` is unaffected, being recognised directly
+  rather than by searching.
+
+#### One step into a compiled container
+
+That second boundary cost more than it looked. A container from a dependency — `State<T>` from
+`mutableStateOf`, `Lazy<T>`, `LiveData<T>`, `Optional<T>` — exists to be read through, and reading
+through it is exactly what erases. The member was left unstubbed and the Preview threw at render time
+(issue #80):
+
+```kotlin
+interface ScreenViewModel { val uiState: State<UiState> }
+
+viewModel = mockk<ScreenViewModel>(relaxed = true),   // before — ClassCastException on .value
+```
+
+Such a type is now opened, under two limits that are the whole of the fix:
+
+- **Its own members only, and nothing below them.** No recursion, so this cannot branch.
+- **Only when a member the consumer wrote is holding it.** Asked of the member's
+  `parentDeclaration`, so an inherited member of a compiled supertype does not count.
+
+Every report of the crash came from a member declared on a consumer's own type; every explosion came
+from a compiled type's own members. `LocalDate.datesUntil(): Stream<LocalDate>` is the second kind and
+stays shut — which matters, because `Stream`, `Optional` and `Iterator` hand each other back and that
+is where 61 mocks came from one date field (issue #87).
+
+An earlier attempt opened any compiled type carrying a type argument. That condition says a type
+*erases*, not that looking inside it is *cheap*, and it shipped the explosion (#84, reverted in #88).
+Measured on the same `Stream`: held by a member the consumer wrote it now adds exactly one mock.
+
+The remaining gap is two hops — `Sequence<T>` reaches `T` through `Iterator<T>`, so finding it would
+mean walking from one compiled type into another, which is the shape that exploded. A value read that
+way still throws.
 
 Narrowing makes the blow-up rare rather than impossible — a graph whose every branch leads to
 something erased still expands along all of them — so `MockContext.MAX_STUBS` caps the total for one
