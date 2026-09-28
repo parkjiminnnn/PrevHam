@@ -293,6 +293,58 @@ class MockMemberStubbingTest {
     }
 
     @Test
+    fun `does not expand a compiled type held as an interface member`() {
+        // The third way into the same type, and the one #80 changes the rules around. LocalDate is
+        // reached from a member a consumer did write, so the decision to descend is asked here -
+        // and it has to keep answering no. Nothing LocalDate declares returns a type parameter, so
+        // opening a door for the ones that do must not open this.
+        val generated =
+            generate(
+                "Schedule",
+                "interface ScheduleViewModel { val startDate: java.time.LocalDate }",
+            )
+
+        val mocks = generated.split("mockk<").size - 1
+        assertTrue("$mocks mocks:\n$generated", mocks <= 2)
+        assertFalse(generated, generated.contains("Stream<"))
+    }
+
+    @Test
+    fun `bounds a dense compiled generic held as a data class field`() {
+        // Stream is the type that turned one LocalDate field into 61 mocks in #87: about forty
+        // members, several of which hand back Stream, Optional or Iterator of the same element, so
+        // it multiplies as soon as anything is willing to walk it. Pinned here at its current size
+        // so a change to the descent rules has to come back past it.
+        val generated =
+            generate(
+                "Lineup",
+                "data class Item(val title: String)\ndata class Lineup(val items: java.util.stream.Stream<Item>)",
+                parameter = "lineup: Lineup",
+            )
+
+        val mocks = generated.split("mockk<").size - 1
+        assertTrue("$mocks mocks:\n$generated", mocks <= 3)
+    }
+
+    @Test
+    fun `bounds a dense compiled generic held as an interface member`() {
+        // The shape #80's rule newly admits: the member is declared on a type from the consumer's
+        // own sources, so Stream becomes reachable where LocalDate above does not. Whatever the
+        // rule ends up being, this is where it has to stay small.
+        val generated =
+            generate(
+                "Catalog",
+                """
+                data class Item(val title: String)
+                interface CatalogViewModel { val items: java.util.stream.Stream<Item> }
+                """,
+            )
+
+        val mocks = generated.split("mockk<").size - 1
+        assertTrue("$mocks mocks:\n$generated", mocks <= 3)
+    }
+
+    @Test
     fun `stubs a member whose name also exists on MockK's matcher scope`() {
         // Inside every { } the receivers nest - MockKMatcherScope innermost, the mock outside it -
         // so an unqualified name resolves against MockK's first. get, invoke, less and hint all

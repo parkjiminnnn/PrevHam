@@ -4,6 +4,7 @@ import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
@@ -39,8 +40,17 @@ import com.google.devtools.ksp.symbol.Origin
 internal class StubNecessity {
     private val cache = mutableMapOf<String, Boolean>()
 
-    /** Whether a member declaring [type] has to be stubbed rather than left to relaxed mode. */
-    fun isNeededFor(declaredType: KSType): Boolean {
+    /**
+     * Whether a member declaring [type] has to be stubbed rather than left to relaxed mode.
+     *
+     * [declaredOnSource] says whether the member holding it was declared in the sources being
+     * compiled, which is what decides how far a compiled type may be opened. See
+     * [opensCompiledContainer].
+     */
+    fun isNeededFor(
+        declaredType: KSType,
+        declaredOnSource: Boolean,
+    ): Boolean {
         // A member declared with a typealias reaches here as the alias, which knows nothing about
         // what it stands for - a `typealias Items = StateFlow<Item>` would not be recognised as a
         // Flow and the member would be left to relaxed mode (issue #81).
@@ -50,11 +60,49 @@ internal class StubNecessity {
         // into one finds the standard library's generic members and reports back a false positive.
         if (type.isLiteral()) return false
         val declaration = type.declaration as? KSClassDeclaration ?: return false
-        // The search can't say anything useful about a type it won't look inside, and looking
-        // inside a compiled dependency is what produces the false positives described below.
-        if (!declaration.isFromSource()) return false
+        if (!declaration.isFromSource()) return declaredOnSource && declaration.opensCompiledContainer()
         val name = declaration.qualifiedName?.asString() ?: return false
         return cache.getOrPut(name) { type.reachesErasedMember() }
+    }
+
+    /**
+     * Whether a compiled type may be opened, having been named by a member of the consumer's own.
+     *
+     * A container like `State<T>`, `Lazy<T>` or `LiveData<T>` exists to be read through, and reading
+     * through it is exactly what erases: `value` compiles to `Object getValue()`, relaxed mode
+     * answers from that, and the caller's checkcast rejects it - issue #59's crash, one type removed.
+     * The search never reached them, because it stops at anything not declared in the sources being
+     * compiled (issue #80).
+     *
+     * Two limits make opening one safe, and #84 had neither:
+     *
+     * - **Only its own members are examined, and nothing below them.** No recursion, so this cannot
+     *   branch. #84 let the search walk transitively through compiled types, and a `LocalDate` field
+     *   reached `Stream` through `datesUntil()`, then `Optional` and `Iterator` from there - 61 mocks
+     *   from one date (issue #87).
+     * - **Only from a member the consumer wrote.** Every report of the crash came from a member
+     *   declared on a consumer's own type; every explosion came from a compiled type's own members,
+     *   which nobody asked for. `LocalDate.datesUntil()` fails this and stays shut.
+     *
+     * "Has a type argument" was #84's condition and is the wrong one: it says a type erases, not
+     * that looking inside it is cheap.
+     */
+    private fun KSClassDeclaration.opensCompiledContainer(): Boolean {
+        val name = qualifiedName?.asString() ?: return false
+        return cache.getOrPut("compiled:$name") {
+            getAllProperties().filter { it.isStubbable() }.any {
+                it.type
+                    .resolve()
+                    .resolveTypeAliases()
+                    .needsStubItself()
+            } ||
+                getAllFunctions().filter { it.isStubbable() }.any {
+                    it.returnType
+                        ?.resolve()
+                        ?.resolveTypeAliases()
+                        ?.needsStubItself() == true
+                }
+        }
     }
 
     /**
@@ -105,15 +153,29 @@ internal class StubNecessity {
             val name = declaration.qualifiedName?.asString() ?: continue
             if (!visited.add(name)) continue
 
+            // Paired with where each member was declared, because an inherited one can come from a
+            // compiled supertype even while the type being walked is from source.
             val memberTypes =
-                declaration.getAllProperties().filter { it.isStubbable() }.map { it.type.resolve().resolveTypeAliases() } +
-                    declaration.getAllFunctions().filter { it.isStubbable() }.mapNotNull { it.returnType?.resolve()?.resolveTypeAliases() }
+                declaration.getAllProperties().filter { it.isStubbable() }.map {
+                    it.type
+                        .resolve()
+                        .resolveTypeAliases() to it.declaredOnSource()
+                } +
+                    declaration.getAllFunctions().filter { it.isStubbable() }.mapNotNull {
+                        it.returnType
+                            ?.resolve()
+                            ?.resolveTypeAliases()
+                            ?.to(it.declaredOnSource())
+                    }
 
-            for (memberType in memberTypes) {
+            for ((memberType, declaredOnSource) in memberTypes) {
                 if (memberType.needsStubItself()) return true
                 if (memberType.isLiteral()) continue
                 val memberDeclaration = memberType.declaration as? KSClassDeclaration ?: continue
-                if (!memberDeclaration.isFromSource()) continue
+                if (!memberDeclaration.isFromSource()) {
+                    if (declaredOnSource && memberDeclaration.opensCompiledContainer()) return true
+                    continue
+                }
                 pending += memberDeclaration
             }
         }
@@ -154,3 +216,12 @@ internal fun KSFunctionDeclaration.isStubbable(): Boolean {
  * a model about every one of them.
  */
 internal fun KSClassDeclaration.isFromSource(): Boolean = origin == Origin.KOTLIN || origin == Origin.JAVA
+
+/**
+ * Whether the type that declares this member is part of the sources being compiled.
+ *
+ * Asked of the declaring type rather than the one being mocked, since `getAllProperties()` and
+ * `getAllFunctions()` reach through supertypes: a consumer's own ViewModel inherits members from
+ * `androidx.lifecycle.ViewModel`, and those are not members the consumer wrote.
+ */
+internal fun KSDeclaration.declaredOnSource(): Boolean = (parentDeclaration as? KSClassDeclaration)?.isFromSource() == true

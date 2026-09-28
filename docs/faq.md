@@ -127,6 +127,9 @@ still hit this crash:
   the list above).
 - **A member whose type is already being expanded further up the chain.** Recursion has to stop
   somewhere, and that mock comes out bare.
+- **A compiled container reached through another compiled type**, such as `Sequence<T>`, whose `T` is
+  read through `Iterator<T>`. A container held directly by a member you wrote — `State<T>`, `Lazy<T>`,
+  `LiveData<T>`, `Optional<T>` — is stubbed (issue #80).
 
 A long chain of interfaces is no longer one of these. `Outer.middle` → `Middle.inner` →
 `Inner.items: StateFlow<Item>` used to leave the innermost mock bare once the old depth limit ran
