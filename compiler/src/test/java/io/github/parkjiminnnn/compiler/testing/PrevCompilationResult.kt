@@ -5,6 +5,7 @@ import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.SourceFile
 import com.tschuchort.compiletesting.configureKsp
 import com.tschuchort.compiletesting.sourcesGeneratedBySymbolProcessor
+import com.tschuchort.compiletesting.useKsp2
 import io.github.parkjiminnnn.compiler.PrevSymbolProcessorProvider
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 
@@ -34,6 +35,11 @@ internal fun compilePrev(
         KotlinCompilation().apply {
             this.sources = Stubs.all + sources.toList()
             inheritClassPath = true
+            // kctfork drives KSP1 unless asked otherwise, and consumer builds have been on KSP2 for
+            // some time - the Gradle plugin runs the processor through KspAATask even on the old
+            // <kotlin>-<ksp> versions. These tests were therefore covering a path nobody's build
+            // took (issue #73).
+            useKsp2()
             configureKsp {
                 symbolProcessorProviders.add(PrevSymbolProcessorProvider())
                 processorOptions.putAll(options)

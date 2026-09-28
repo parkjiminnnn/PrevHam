@@ -49,7 +49,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -70,7 +70,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -138,7 +138,7 @@ class PrevHamPluginTest {
                 plugins {
                     id("io.github.parkjiminnnn.prevham")
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                 }
                 repositories { mavenCentral() }
                 $printDependencies
@@ -157,7 +157,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -180,7 +180,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -210,7 +210,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -235,7 +235,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -262,7 +262,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -297,7 +297,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -333,7 +333,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -367,7 +367,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -397,7 +397,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -427,7 +427,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }
@@ -458,7 +458,7 @@ class PrevHamPluginTest {
                 """
                 plugins {
                     kotlin("jvm") version "2.2.10"
-                    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+                    id("com.google.devtools.ksp") version "$KSP_VERSION"
                     id("io.github.parkjiminnnn.prevham")
                 }
                 repositories { mavenCentral() }

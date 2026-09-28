@@ -231,6 +231,25 @@ In rough order of preference:
 3. **Add a new `MockGenerator`** if the type shape is genuinely something PrevHam should support — see
    [`extending-mock-generators.md`](extending-mock-generators.md).
 
+## Does PrevHam work on KSP2?
+
+Yes, and on KSP1. The processor is built against the KSP 2.3 API, and a project still on a
+`<kotlin>-<ksp>` version such as `2.2.10-2.0.2` compiles against it unchanged — verified in the
+plugin's TestKit builds and against a real app.
+
+Nothing has to be switched on. KSP 2.3 runs KSP2 by default; the task that executes the processor is
+`KspAATask` rather than the old compiler-plugin task.
+
+Two things to know when moving a project to KSP 2.3:
+
+- **AGP 8.12.0 or newer** is required by KSP itself, not by PrevHam. Below it, applying the plugin
+  fails with `The minimum supported AGP version is 8.12.0`.
+- **The version format changed.** KSP1 shipped one artifact per Kotlin version (`2.2.10-2.0.2`); KSP2
+  is versioned on its own (`2.3.12`).
+
+This is why PrevHam's Gradle plugin does not apply KSP for you. Consumers are split across the two,
+and applying either would decide for the half running the other.
+
 ## Why does my build say "Module was compiled with an incompatible version of Kotlin"?
 
 Your Kotlin is older than 2.2. The full error, from a real consumer build on Kotlin 2.0.21:

@@ -83,7 +83,7 @@ PrevHam
 
 **Constraints**
 
-- Must not apply KSP. A KSP version is tied to a Kotlin version, so applying it would pin the consumer's Kotlin version to PrevHam's; the KSP Gradle plugin is `compileOnly` for the same reason.
+- Must not apply KSP. KSP1 and KSP2 are both in use and KSP 2.3 requires AGP 8.12.0, so applying either would decide for the consumers running the other; the KSP Gradle plugin is `compileOnly` for the same reason.
 - Must fail with an actionable message when KSP or a Kotlin plugin is missing.
 - Behaviour is verified with Gradle TestKit, against real builds.
 
