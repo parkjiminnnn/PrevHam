@@ -20,15 +20,22 @@ import org.gradle.api.Project
  *
  * ### Why it doesn't apply KSP
  *
- * A KSP version is pinned to a Kotlin version — `2.2.10-2.0.2` works with Kotlin 2.2.10 and nothing
- * else. Applying KSP here would put PrevHam's Kotlin version on every consumer, and one on a newer
- * Kotlin would be unable to use PrevHam at all until a matching release came out. So KSP stays the
- * consumer's to declare, at the version matching their Kotlin, and this plugin only checks that it's
- * there. It's also where KSP-based libraries have generally landed: Room, Moshi, Hilt and Koin
- * Annotations all leave the KSP declaration to the consumer.
+ * The reason used to be that a KSP version was pinned to a Kotlin version — `2.2.10-2.0.2` worked with
+ * Kotlin 2.2.10 and nothing else, so applying KSP would have put PrevHam's Kotlin version on every
+ * consumer. KSP2 dropped that coupling and the version is now plain (`2.3.12`), so that particular
+ * argument is gone. The conclusion is not.
+ *
+ * KSP is mid-transition and consumers are split across it. KSP1 is deprecated but still in use, KSP2
+ * carries requirements of its own — 2.3 refuses to apply below AGP 8.12.0 — and a plugin that applied
+ * either would decide for the half of consumers running the other. Left undeclared, PrevHam works on
+ * both: its processor is built against the 2.3 API and a consumer still on `2.2.10-2.0.2` compiles
+ * against it unchanged, which is verified in the TestKit builds and against a real app.
+ *
+ * It is also where KSP-based libraries have landed: Room, Moshi, Hilt and Koin Annotations all leave
+ * the KSP declaration to the consumer.
  *
  * The KSP Gradle plugin is a `compileOnly` dependency of this module for the same reason — it must
- * not reach the consumer's buildscript classpath and force a version there.
+ * not reach the consumer's buildscript classpath and decide a version there.
  */
 class PrevHamPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -101,9 +108,9 @@ class PrevHamPlugin : Plugin<Project> {
 
         val MISSING_KSP_MESSAGE =
             """
-            PrevHam needs the KSP plugin, which it deliberately doesn't apply for you: a KSP version
-            is tied to a Kotlin version, so declaring it yourself leaves you free to move to a newer
-            Kotlin. Add it to your plugins block at the version matching your Kotlin:
+            PrevHam needs the KSP plugin, which it deliberately doesn't apply for you: KSP1 and KSP2
+            are both in use and applying either would decide for you. Add the one your project runs
+            to your plugins block:
 
                 plugins {
                     id("$KSP_PLUGIN_ID") version "<version for your Kotlin>"
