@@ -10,7 +10,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 [![CI](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml/badge.svg)](https://github.com/parkjiminnnn/PrevHam/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.2%2B-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
-[![KSP](https://img.shields.io/badge/KSP-2.2.10--2.0.2-purple.svg)](https://github.com/google/ksp)
+[![KSP](https://img.shields.io/badge/KSP-2.3%2B-purple.svg)](https://github.com/google/ksp)
 
 [Why PrevHam?](#-why-prevham) •
 [Quick Start](#-quick-start) •
@@ -103,6 +103,10 @@ fun UserCard(
 **Kotlin 2.2 or newer.** A newer Kotlin is fine; an older one cannot consume PrevHam at all — see
 [why](docs/faq.md#why-does-my-build-say-module-was-compiled-with-an-incompatible-version-of-kotlin).
 
+**KSP1 or KSP2, whichever your project runs.** PrevHam is built against the KSP 2.3 API and works on
+both. KSP 2.3 itself requires AGP 8.12.0 or newer on Android, which is a reason to pick your own
+version rather than have one applied for you.
+
 `<version>` below stands for the current release — the number on the Maven Central badge at the top
 of this page, which is generated from the repository itself and is never out of date.
 
@@ -111,16 +115,16 @@ of this page, which is generated from the repository itself and is never out of 
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+    id("com.google.devtools.ksp") version "2.3.12"
     id("io.github.parkjiminnnn.prevham") version "<version>"
 }
 ```
 
 That's the whole setup — the PrevHam plugin declares `prevham-runtime`, `prevham-compiler` and MockK for you, all at its own version, so they can't drift apart.
 
-The KSP version is yours to pick, and deliberately so. A KSP version is tied to a Kotlin version, so applying KSP here would stop you moving to a newer Kotlin until PrevHam released against it. Use the one matching your Kotlin.
+The KSP version is yours to pick, and deliberately so. KSP1 and KSP2 are both in use, KSP 2.3 needs AGP 8.12.0 or newer, and applying either here would decide that for you. PrevHam works on both — the processor is built against the 2.3 API and a project still on a `<kotlin>-<ksp>` version compiles against it unchanged.
 
-That keeps the ceiling open, not the floor: `prevham-runtime` is compiled Kotlin, so 2.2 is still the minimum whatever KSP you pick.
+That keeps the ceiling open, not the floor: `prevham-runtime` is compiled Kotlin, so Kotlin 2.2 is still the minimum whatever KSP you pick.
 
 <details>
 <summary>Declaring the dependencies by hand instead</summary>
@@ -129,7 +133,7 @@ Necessary for Kotlin Multiplatform, whose source sets use different configuratio
 
 ```kotlin
 plugins {
-    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+    id("com.google.devtools.ksp") version "2.3.12"
 }
 
 dependencies {

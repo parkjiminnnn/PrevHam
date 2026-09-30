@@ -127,6 +127,9 @@ still hit this crash:
   the list above).
 - **A member whose type is already being expanded further up the chain.** Recursion has to stop
   somewhere, and that mock comes out bare.
+- **A compiled container reached through another compiled type**, such as `Sequence<T>`, whose `T` is
+  read through `Iterator<T>`. A container held directly by a member you wrote — `State<T>`, `Lazy<T>`,
+  `LiveData<T>`, `Optional<T>` — is stubbed (issue #80).
 
 A long chain of interfaces is no longer one of these. `Outer.middle` → `Middle.inner` →
 `Inner.items: StateFlow<Item>` used to leave the innermost mock bare once the old depth limit ran
@@ -227,6 +230,25 @@ In rough order of preference:
    projections by specifying a concrete type argument).
 3. **Add a new `MockGenerator`** if the type shape is genuinely something PrevHam should support — see
    [`extending-mock-generators.md`](extending-mock-generators.md).
+
+## Does PrevHam work on KSP2?
+
+Yes, and on KSP1. The processor is built against the KSP 2.3 API, and a project still on a
+`<kotlin>-<ksp>` version such as `2.2.10-2.0.2` compiles against it unchanged — verified in the
+plugin's TestKit builds and against a real app.
+
+Nothing has to be switched on. KSP 2.3 runs KSP2 by default; the task that executes the processor is
+`KspAATask` rather than the old compiler-plugin task.
+
+Two things to know when moving a project to KSP 2.3:
+
+- **AGP 8.12.0 or newer** is required by KSP itself, not by PrevHam. Below it, applying the plugin
+  fails with `The minimum supported AGP version is 8.12.0`.
+- **The version format changed.** KSP1 shipped one artifact per Kotlin version (`2.2.10-2.0.2`); KSP2
+  is versioned on its own (`2.3.12`).
+
+This is why PrevHam's Gradle plugin does not apply KSP for you. Consumers are split across the two,
+and applying either would decide for the half running the other.
 
 ## Why does my build say "Module was compiled with an incompatible version of Kotlin"?
 
