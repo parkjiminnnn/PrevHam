@@ -32,6 +32,15 @@ jobs:
       - name: Build all modules
         run: ./gradlew assemble --stacktrace
 
+      # Nothing else here creates the publish tasks, so a build that could not publish passed every
+      # check and failed only in the release workflow - after the merge to main, at the one step
+      # that cannot be retried casually. v1.4.0 did exactly that: a module resolving a plugin on its
+      # own got a classloader of its own, and the publishing plugin's shared build service could not
+      # be wired across two. --dry-run builds the task graph and uploads nothing, which is enough to
+      # reproduce it and needs no credentials.
+      - name: Verify the publish task graph
+        run: ./gradlew publish --dry-run --stacktrace
+
   unit-test:
     name: Unit tests
     runs-on: ubuntu-latest
