@@ -1,7 +1,7 @@
 plugins {
     id("prevham.android.application")
     id("prevham.ktlint")
-    alias(libs.plugins.ksp)
+    id("prevham.ksp")
 }
 
 android {

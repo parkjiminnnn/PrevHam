@@ -59,5 +59,4 @@ kotlin-compile-testing-ksp = { group = "dev.zacsweers.kctfork", name = "ksp", ve
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrainsKotlinJvm" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 

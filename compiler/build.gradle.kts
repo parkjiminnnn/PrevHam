@@ -4,7 +4,7 @@ import com.vanniktech.maven.publish.KotlinJvm
 plugins {
     id("prevham.kotlin.jvm")
     id("prevham.ktlint")
-    alias(libs.plugins.ksp)
+    id("prevham.ksp")
     id("prevham.publishing")
 }
 

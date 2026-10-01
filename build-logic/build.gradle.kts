@@ -8,5 +8,7 @@ dependencies {
     implementation(libs.ktlint.gradlePlugin)
     implementation(libs.kotlin.compose.gradlePlugin)
     implementation(libs.mavenPublish.gradlePlugin)
+    // runtimeOnly, deliberately - see prevham.ksp.gradle.kts for both halves of why.
+    runtimeOnly(libs.ksp.gradlePlugin)
     implementation(libs.dokka.gradlePlugin)
 }
