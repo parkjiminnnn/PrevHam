@@ -1,6 +1,7 @@
 package io.github.parkjiminnnn.gradle
 
 import org.gradle.api.Project
+import org.gradle.api.tasks.PathSensitivity
 
 /**
  * Sets the options the compiler reads.
@@ -64,10 +65,51 @@ internal object KspOptions {
             WARN_ON_MISSING_VALUES_OPTION,
             extension.warnOnMissingValues.getOrElse(true).toString(),
         )
+        declareValueFileAsInput(project, extension)
+    }
+
+    /**
+     * Makes the value file an input of every KSP task, so changing it re-runs the processor.
+     *
+     * The option above hands the processor a path, and Gradle fingerprints that option as the
+     * string it is. The path never changes, so a build after the file changed found every input
+     * identical and skipped KSP - the Preview kept its old values, including straight after
+     * prevhamGenerateMockValues had written new ones (issue #133). Gradle cannot see what a task
+     * reads while it runs; anything read that way has to be declared.
+     *
+     * - `files`, not `file(...).optional()`: the file does not exist until values are first
+     *   generated, and a project that never uses the feature must build exactly as before.
+     *   `optional()` only lets the property go unset - a path that is set must exist, and the build
+     *   fails on it. A missing entry in a file collection is allowed, and fingerprinted as missing, so
+     *   the file appearing later still counts as a change.
+     * - `PathSensitivity.NONE`: the content is what decides, not where the file sits, so two
+     *   checkouts at different paths agree.
+     * - Matched by task name rather than type, because the KSP Gradle plugin is `compileOnly` here -
+     *   see the class comment. `configureEach` attaches this as tasks are created instead of
+     *   creating them, so configuration is not slowed.
+     *
+     * The other direction is deliberately kept: with nothing changed, KSP stays up to date. Forcing
+     * it to run on every build would also make the values arrive, and would slow every build of
+     * every consumer to do it.
+     */
+    private fun declareValueFileAsInput(
+        project: Project,
+        extension: PrevHamExtension,
+    ) {
+        project.tasks.configureEach { task ->
+            if (!task.name.startsWith(KSP_EXTENSION_NAME) || !task.name.endsWith("Kotlin")) return@configureEach
+            task.inputs
+                .files(extension.mockValues)
+                .withPathSensitivity(PathSensitivity.NONE)
+                .withPropertyName(MOCK_VALUES_INPUT)
+        }
     }
 
     private const val KSP_EXTENSION_NAME = "ksp"
     const val MOCK_VALUES_OPTION = "prevham.mockValues"
     const val SLOT_MANIFEST_OPTION = "prevham.slotManifest"
     const val WARN_ON_MISSING_VALUES_OPTION = "prevham.warnOnMissingValues"
+
+    // What Gradle prints when the file is why KSP re-ran - worth reading as a name.
+    private const val MOCK_VALUES_INPUT = "prevhamMockValues"
 }
