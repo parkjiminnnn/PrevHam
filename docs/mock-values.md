@@ -197,6 +197,41 @@ Adding a property therefore costs one slot rather than a whole regeneration:
 [PrevHam] 1 new value(s); 28 in '…/mock-values.json'
 ```
 
+### Seeing a change in the Preview
+
+The value file is an input of the KSP task, so the next build after it changes — refreshing the
+Preview is one — runs the processor again, whether the change came from the task or from a hand edit.
+With the file untouched, KSP stays up to date as usual. `--info` says which it was:
+
+```
+Task ':app:kspDebugKotlin' is not up-to-date because:
+  Input property 'prevhamMockValues' file …/mock-values.json has changed.
+```
+
+Up to v1.4.0 it was not: the path reached the processor only as a string KSP option, which Gradle
+compares as a string, so a changed file never re-ran KSP and the Preview kept its old values. On those
+versions, `./gradlew :app:kspDebugKotlin --rerun` applies them.
+
+#### Wiring the options by hand
+
+The Gradle plugin declares the input. A project passing the options itself with
+`ksp { arg("prevham.mockValues", …) }` has to declare it too, or the same thing happens:
+
+```kotlin
+tasks.configureEach {
+    if (name.startsWith("ksp") && name.endsWith("Kotlin")) {
+        inputs
+            .files("src/main/prevham/mock-values.json")
+            .withPathSensitivity(PathSensitivity.NONE)
+            .withPropertyName("prevhamMockValues")
+    }
+}
+```
+
+`inputs.files` rather than `inputs.file(…).optional()`, because the file does not exist until values are
+first generated: `optional()` only allows the property to be unset, and a path that is set but missing
+fails the build.
+
 ---
 
 ## Members of a mocked type
