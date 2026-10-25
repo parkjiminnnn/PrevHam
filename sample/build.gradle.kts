@@ -70,3 +70,15 @@ ksp {
     arg("prevham.mockValues", "$projectDir/src/main/prevham/mock-values.json")
     arg("prevham.warnOnMissingValues", "false")
 }
+
+// The Gradle plugin declares this for the projects that apply it. Passing the path by hand, as above,
+// means declaring the file by hand too: KSP sees the option as a string, so without this a changed
+// value never re-runs it and the Previews keep their old values (issue #133).
+tasks.configureEach {
+    if (name.startsWith("ksp") && name.endsWith("Kotlin")) {
+        inputs
+            .files("src/main/prevham/mock-values.json")
+            .withPathSensitivity(PathSensitivity.NONE)
+            .withPropertyName("prevhamMockValues")
+    }
+}
