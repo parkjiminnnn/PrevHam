@@ -19,11 +19,12 @@ internal data class MockSlot(
 }
 
 /**
- * The slots met while generating, in the order they were filled.
+ * The slots met while generating one @Prev function's Preview.
  *
- * Shared across the whole round rather than copied on descent - it describes one compilation, not
- * one path through it - and appended to only while generating, never while deciding, so [MockContext.canMock]
- * stays free of side effects.
+ * One per function rather than per compilation, so the processor can file what it records under the
+ * function's source file. Shared across every path through that function rather than copied on
+ * descent - it describes the Preview, not one path through it - and appended to only while
+ * generating, never while deciding, so [MockContext.canMock] stays free of side effects.
  *
  * Only the processor can produce this list. Whether `Festival.festivalName` is a slot at all depends
  * on PrevHam reaching `Festival`, and that is decided by cycle detection, the stub budget, typealias

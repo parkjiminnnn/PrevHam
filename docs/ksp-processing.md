@@ -142,8 +142,9 @@ Three things are said once every round has run, not per round and not where they
 
 ```kotlin
 override fun finish() {
-    writeSlotManifest()
-    warnAboutUndecidedSlots()
+    val sources = updatedSlotSources()
+    writeSlotManifest(sources)
+    warnAboutUndecidedSlots(sources.values.flatten())
     reportRound()
 }
 
@@ -258,3 +259,38 @@ specific to the `aggregating` flag's value. `aggregating` controls invalidation 
 means any change anywhere can force reprocessing. Since each `@Prev` function's mock generation only
 ever depends on symbols reachable from its own containing file, `aggregating = false` gives the more
 precise (and cheaper) invalidation scope without losing correctness.
+
+### The slot manifest
+
+The Previews go through KSP's `CodeGenerator`, so KSP keeps the ones it did not regenerate. The slot
+manifest does not. The processor writes it directly in `finish()`, and on an incremental build
+`finish()` has seen only the files KSP passed in. Up to v1.4.1 the manifest was replaced with that
+subset. On `:sample`, editing one file with no `@Prev` in it took the manifest from 36 slots to 12,
+and deleting the file afterwards did not bring them back (issue #139).
+
+The manifest now records which source file each slot came from, and `finish()` updates it instead of
+replacing it ([`SlotSources`](../compiler/src/main/java/io/github/parkjiminnnn/compiler/mock/SlotSources.kt)):
+
+1. Read the previous manifest.
+2. Replace the entry of every file in `resolver.getNewFiles()`, which is every file on a clean build
+   and only the affected ones on an incremental build. A file whose `@Prev` is gone gets no entry.
+3. Drop the entries of files that no longer exist.
+4. Write `slots` as the union of the entries that remain.
+
+Keeping a file's entry when KSP did not pass the file in is safe for the same reason keeping its
+Preview is. The slots come from the same traversal that writes the Preview, and KSP reprocesses a
+`@Prev` file whenever something it resolved changes. So an entry is exactly as current as the Preview
+next to it.
+
+A manifest from an earlier version has no `sources`, so it reads as empty. Upgrading changes the
+processor classpath, and KSP answers that with a full rebuild ("The input changes require a full
+rebuild"), so the first build after an upgrade writes the full manifest. This was measured going from
+1.4.1 to the current processor.
+
+`IncrementalSlotManifestTest` runs these cases in real Gradle builds, using the processor built in
+this module. kctfork compiles every file on every run, so it never does an incremental build.
+
+Writing the manifest through `CodeGenerator` as an aggregating output was considered. It would move
+the file into KSP's output directory, which would change what the Gradle plugin passes and what the
+task reads. It is also not established how KSP reprocesses an aggregating output on an incremental
+build. Merging keeps every decision inside PrevHam.
