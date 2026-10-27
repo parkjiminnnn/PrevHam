@@ -61,6 +61,16 @@ class SlotManifestTest {
     }
 
     @Test
+    fun `says which source file each slot came from`() {
+        // What lets an incremental build replace only the files it reprocessed rather than the
+        // whole manifest (issue #139). IncrementalSlotManifestTest covers the builds themselves.
+        val manifest = manifestFor("Festival", "data class Festival(val festivalName: String)", "festival: Festival")
+
+        val entry = Regex(""""[^"]*Festival\.kt": \[\s*"test\.Festival\.festivalName"\s*]""")
+        assertTrue(manifest, entry.containsMatchIn(manifest))
+    }
+
+    @Test
     fun `lists the composable's own parameter`() {
         val manifest = manifestFor("Greeting", "", "name: String")
 

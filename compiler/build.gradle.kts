@@ -30,3 +30,34 @@ dependencies {
     testImplementation(libs.kotlin.compile.testing.core)
     testImplementation(libs.kotlin.compile.testing.ksp)
 }
+
+// IncrementalSlotManifestTest runs this processor in real Gradle builds, because incremental
+// processing only happens there - kctfork compiles everything every time. It has to be the processor
+// as built here rather than a released one, since what those builds check is the processor's own
+// behaviour (issue #139). Handed over as paths, and declared as inputs so a change to either reruns
+// the tests.
+val testConsumerRuntime: Configuration by configurations.creating { isTransitive = false }
+
+dependencies {
+    testImplementation(gradleTestKit())
+    testConsumerRuntime(project(":runtime"))
+}
+
+tasks.test {
+    val processorClasspath = files(tasks.jar, configurations.runtimeClasspath)
+    val runtimeClasspath = files(testConsumerRuntime)
+    val kotlinVersion = libs.versions.kotlin.get()
+    val kspVersion = libs.versions.ksp.get()
+    inputs.files(processorClasspath).withNormalizer(ClasspathNormalizer::class).withPropertyName("processorClasspath")
+    inputs.files(runtimeClasspath).withNormalizer(ClasspathNormalizer::class).withPropertyName("consumerRuntime")
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOf(
+                "-Dprevham.test.processorClasspath=${processorClasspath.asPath}",
+                "-Dprevham.test.runtimeClasspath=${runtimeClasspath.asPath}",
+                "-Dprevham.test.kotlinVersion=$kotlinVersion",
+                "-Dprevham.test.kspVersion=$kspVersion",
+            )
+        },
+    )
+}
