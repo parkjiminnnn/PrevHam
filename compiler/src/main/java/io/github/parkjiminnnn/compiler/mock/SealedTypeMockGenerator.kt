@@ -21,6 +21,11 @@ import com.squareup.kotlinpoet.CodeBlock
  * properties: the subtype is chosen here and written into the generated file, and its fields carry
  * the same mock values every other generator produces.
  *
+ * This picks one subtype, which is what a sealed type reached anywhere below a composable's own
+ * parameters gets. A sealed parameter of the composable itself gets every subtype instead, one
+ * Preview each - see [SealedParameterExpansion]. Both read the same [sealedSubtypes] and
+ * [isBuildableSubtype], so the one picked here is always the first of those.
+ *
  * Must be registered ahead of [InterfaceMockGenerator], which would otherwise claim sealed
  * interfaces and sealed classes as ordinary mockable types.
  */
@@ -28,37 +33,46 @@ internal class SealedTypeMockGenerator : MockGenerator {
     override fun supports(
         type: KSType,
         context: MockContext,
-    ): Boolean = type.firstMockableSubtype(context) != null
+    ): Boolean = type.firstBuildableSubtype(context) != null
 
     override fun generate(
         type: KSType,
         context: MockContext,
     ): CodeBlock {
-        val subtype = type.firstMockableSubtype(context)!!
+        val subtype = type.firstBuildableSubtype(context)!!
         if (subtype.classKind == ClassKind.OBJECT) return CodeBlock.of("%T", subtype.toClassName())
         return context.mock(subtype.asStarProjectedType())
     }
 
-    private fun KSType.firstMockableSubtype(context: MockContext): KSClassDeclaration? {
-        val declaration = declaration as? KSClassDeclaration ?: return null
-        if (Modifier.SEALED !in declaration.modifiers) return null
-        // A generic sealed type's subtypes would need their type arguments substituted, which
-        // asStarProjectedType() can't do. Leave those to InterfaceMockGenerator.
-        if (declaration.typeParameters.isNotEmpty()) return null
-        return declaration
-            .getSealedSubclasses()
-            // getSealedSubclasses() promises no particular order - not even declaration order - so
-            // sort to keep generated code reproducible. Object subtypes sort first: they need
-            // nothing constructed, so they can't be turned away by a recursion bound, and they
-            // introduce no invented field values into the preview.
-            .sortedWith(compareBy({ it.classKind != ClassKind.OBJECT }, { it.simpleName.asString() }))
-            .firstOrNull { it.isMockable(context) }
-    }
+    private fun KSType.firstBuildableSubtype(context: MockContext): KSClassDeclaration? =
+        sealedSubtypes()?.firstOrNull { it.isBuildableSubtype(context) }
+}
 
-    private fun KSClassDeclaration.isMockable(context: MockContext): Boolean {
-        if (typeParameters.isNotEmpty()) return false
-        // An object subtype is just a reference, so it needs no further expansion at all.
-        if (classKind == ClassKind.OBJECT) return true
-        return context.canMock(asStarProjectedType())
-    }
+/**
+ * The direct subtypes of this sealed type in the order PrevHam uses them, or null when it is not a
+ * sealed type PrevHam builds subtypes for.
+ *
+ * `getSealedSubclasses()` promises no particular order - not even declaration order - so they are
+ * sorted to keep generated code reproducible. Object subtypes sort first: they need nothing
+ * constructed, so they can't be turned away by a recursion bound, and they introduce no invented
+ * field values into the Preview.
+ */
+internal fun KSType.sealedSubtypes(): List<KSClassDeclaration>? {
+    val declaration = declaration as? KSClassDeclaration ?: return null
+    if (Modifier.SEALED !in declaration.modifiers) return null
+    // A generic sealed type's subtypes would need their type arguments substituted, which
+    // asStarProjectedType() can't do. Leave those to InterfaceMockGenerator.
+    if (declaration.typeParameters.isNotEmpty()) return null
+    return declaration
+        .getSealedSubclasses()
+        .sortedWith(compareBy({ it.classKind != ClassKind.OBJECT }, { it.simpleName.asString() }))
+        .toList()
+}
+
+/** Whether a value of this subtype can be written into the generated file from [context]. */
+internal fun KSClassDeclaration.isBuildableSubtype(context: MockContext): Boolean {
+    if (typeParameters.isNotEmpty()) return false
+    // An object subtype is just a reference, so it needs no further expansion at all.
+    if (classKind == ClassKind.OBJECT) return true
+    return context.canMock(asStarProjectedType())
 }

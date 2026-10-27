@@ -10,17 +10,17 @@ import com.google.devtools.ksp.symbol.FunctionKind
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Visibility
-import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
 import io.github.parkjiminnnn.compiler.mock.MissingValueReport
 import io.github.parkjiminnnn.compiler.mock.MockContext
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
 import io.github.parkjiminnnn.compiler.mock.MockSlot
 import io.github.parkjiminnnn.compiler.mock.MockValues
+import io.github.parkjiminnnn.compiler.mock.PreviewCase
+import io.github.parkjiminnnn.compiler.mock.SealedParameterExpansion
 import io.github.parkjiminnnn.compiler.mock.SlotManifest
 import io.github.parkjiminnnn.compiler.mock.SlotRecorder
 import io.github.parkjiminnnn.compiler.mock.SlotSources
-import io.github.parkjiminnnn.compiler.mock.buildMockArguments
 import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
 import io.github.parkjiminnnn.compiler.mock.toMockParameter
 import java.io.File
@@ -165,9 +165,9 @@ internal class PrevSymbolProcessor(
             return
         }
 
-        val arguments = buildMockArguments(function) ?: return
+        val cases = previewCases(function) ?: return
         val options = function.previewOptions()
-        val fileSpec = PreviewFileGenerator.generate(function, arguments, options)
+        val fileSpec = PreviewFileGenerator.generate(function, cases, options)
 
         codeGenerator
             .createNewFile(
@@ -180,7 +180,7 @@ internal class PrevSymbolProcessor(
         tally.generated()
     }
 
-    private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
+    private fun previewCases(function: KSFunctionDeclaration): List<PreviewCase>? {
         val parameters = function.parameters.mapNotNull { it.toMockParameter(owner = function.qualifiedName?.asString()) }
         val slots = SlotRecorder()
         val context = MockContext.root(mockGenerators, mockValues, slots)
@@ -194,7 +194,9 @@ internal class PrevSymbolProcessor(
             )
             return null
         }
-        return buildMockArguments(parameters, context).also {
+        // One recorder across every case, so a field only one subtype has - Success.title - is filed
+        // under this source file like any other slot of its Previews.
+        return SealedParameterExpansion.cases(parameters) { MockContext.root(mockGenerators, mockValues, slots) }.also {
             slotsBySource.getOrPut(function.containingFile!!.filePath) { linkedSetOf() } += slots.recorded()
         }
     }

@@ -353,6 +353,10 @@ Long lists are truncated after ten paths. Adopting this mid-project leaves every
 first build, and a wall of paths helps nobody; the count and the task name are what is worth reading
 there.
 
+Upgrading to 1.5.0 adds slots of its own. A sealed parameter now gets a Preview per subtype, so the
+fields of `Success` and `Error` are filled where only `Loading` was before, and they show up here until
+the task is run again.
+
 ### It is still only a build
 
 Nothing is fetched to fix this. Falling back to the default is the correct behaviour for an undecided

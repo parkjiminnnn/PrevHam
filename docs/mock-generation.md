@@ -302,6 +302,15 @@ no invented field values), then by simple name. The first one the context can ac
 wins. Generic sealed types are left to `InterfaceMockGenerator`, since substituting their subtypes'
 type arguments isn't something `asStarProjectedType()` can do.
 
+That single pick is what a sealed type gets anywhere below the composable's own parameters. A sealed
+*parameter* gets every buildable subtype instead, one Preview function each, through
+`SealedParameterExpansion`: it substitutes each subtype for the parameter's type and builds the
+arguments again, so the generators see exactly what they would for a parameter declared as that
+subtype. Both read the same `sealedSubtypes()` order and the same `isBuildableSubtype()` test, so the
+subtype picked deeper down is always the first Preview of an expanded parameter. Only the first sealed
+parameter with two or more buildable subtypes is expanded, and each case gets a fresh context and so
+a stub budget of its own (issue #138).
+
 **`InterfaceMockGenerator`** covers interfaces and non-data classes. It prefers a real instance over a
 mock when the type has a companion object that implements the type itself (`object Modifier : Modifier`
 -style self-implementing companions, e.g. Compose's `Modifier`), emitting a plain reference to the

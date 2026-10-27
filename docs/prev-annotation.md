@@ -56,6 +56,10 @@ Each value adds one more stacked `@Preview`, alongside the default one. Compose'
 | `fontScales` | `FloatArray` | one Preview per font scale |
 | `devices` | `Array<String>` | one Preview per device |
 
+A composable that takes a sealed type already gets one function per subtype, and the variants stack on
+each of them, so the count multiplies: three states with `darkMode = true` is six Previews, named
+`"Loading"`, `"Loading - Dark Mode"` and so on. A configured `name` goes in front: `"Card - Loading"`.
+
 ```kotlin
 @Prev(darkMode = true, locales = ["ko", "en"], fontScales = [0.85f, 1.5f])
 ```
