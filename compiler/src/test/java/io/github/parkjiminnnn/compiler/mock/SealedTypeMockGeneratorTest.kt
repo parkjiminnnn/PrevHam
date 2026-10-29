@@ -12,6 +12,10 @@ import org.junit.Test
 // A sealed type is built as one of its real subtypes rather than mocked. MockK's own answer goes
 // through Objenesis, which skips the constructor and picks a subtype the generated file never
 // records - see SealedTypeMockGenerator's docs.
+//
+// A sealed parameter of the composable itself gets one Preview per subtype instead (see
+// SealedParameterExpansionTest), so the tests about which subtype is picked reach the sealed type
+// through a field, where one is still picked.
 @OptIn(ExperimentalCompilerApi::class)
 class SealedTypeMockGeneratorTest {
     @Test
@@ -29,10 +33,11 @@ class SealedTypeMockGeneratorTest {
                         data object Loading : UiState
                         data class Success(val title: String) : UiState
                     }
+                    data class Screen(val state: UiState)
 
                     @Prev
                     @Composable
-                    fun StateCard(state: UiState) {}
+                    fun StateCard(screen: Screen) {}
                     """,
                 ),
             )
@@ -86,10 +91,11 @@ class SealedTypeMockGeneratorTest {
                     sealed interface Order {
                         $subtypeDeclarations
                     }
+                    data class Cart(val order: Order)
 
                     @Prev
                     @Composable
-                    fun OrderCard(order: Order) {}
+                    fun OrderCard(cart: Cart) {}
                     """,
                 ),
             ).generatedFile("OrderCardPreview.kt")

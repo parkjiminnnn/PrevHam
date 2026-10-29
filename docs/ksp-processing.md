@@ -50,9 +50,9 @@ private fun processFunction(function: KSFunctionDeclaration) {
     if (!function.isComposable()) { /* log error, skip */ return }
     if (function.uncallableFromGeneratedFileReason() != null) { /* log error, skip */ return }
 
-    val arguments = buildMockArguments(function) ?: return
+    val cases = previewCases(function) ?: return
     val options = function.previewOptions()
-    val fileSpec = PreviewFileGenerator.generate(function, arguments, options)
+    val fileSpec = PreviewFileGenerator.generate(function, cases, options)
 
     codeGenerator
         .createNewFile(
@@ -78,8 +78,11 @@ Two checks run before anything is generated, then three pieces of information ar
    close later, this one is structural — `CodeGenerator` has no API to add to an existing file, so
    no future version can make it work. Without the check the file is written anyway and then fails
    to compile, with an error that never mentions PrevHam.
-2. **`arguments: Map<String, CodeBlock>`** — one mock value per parameter of the annotated function,
-   built by the mock generator pipeline (see [mock-generation.md](mock-generation.md)).
+2. **`cases: List<PreviewCase>`** — one mock value per parameter of the annotated function, built by
+   the mock generator pipeline (see [mock-generation.md](mock-generation.md)). Usually one case; a
+   composable taking a sealed type gets one per buildable subtype, each becoming its own
+   `<Composable><Subtype>Preview` function in the same file (`SealedParameterExpansion`, issue #138).
+   The file stays one per composable, so incremental processing replaces or removes it as a whole.
 3. **`options: PreviewOptions`** — read from `@Prev`'s own arguments, covered below.
 
 ### Reading `@Prev`'s own arguments
