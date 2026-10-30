@@ -10,15 +10,17 @@ import com.google.devtools.ksp.symbol.FunctionKind
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Visibility
-import com.squareup.kotlinpoet.CodeBlock
 import io.github.parkjiminnnn.compiler.codegen.PreviewFileGenerator
 import io.github.parkjiminnnn.compiler.mock.MissingValueReport
 import io.github.parkjiminnnn.compiler.mock.MockContext
 import io.github.parkjiminnnn.compiler.mock.MockGeneratorRegistry
+import io.github.parkjiminnnn.compiler.mock.MockSlot
 import io.github.parkjiminnnn.compiler.mock.MockValues
+import io.github.parkjiminnnn.compiler.mock.PreviewCase
+import io.github.parkjiminnnn.compiler.mock.SealedParameterExpansion
 import io.github.parkjiminnnn.compiler.mock.SlotManifest
 import io.github.parkjiminnnn.compiler.mock.SlotRecorder
-import io.github.parkjiminnnn.compiler.mock.buildMockArguments
+import io.github.parkjiminnnn.compiler.mock.SlotSources
 import io.github.parkjiminnnn.compiler.mock.firstUnsupportedParameter
 import io.github.parkjiminnnn.compiler.mock.toMockParameter
 import java.io.File
@@ -32,15 +34,21 @@ internal class PrevSymbolProcessor(
 ) : SymbolProcessor {
     private val mockGenerators = MockGeneratorRegistry.default()
 
-    // One recorder for the whole compilation, not one per function: KSP calls process() once per
-    // round, and the manifest describes everything the compilation met.
-    private val slots = SlotRecorder()
+    // Kept per source file rather than as one list, so finish() can replace only the files this run
+    // was handed and keep the rest from the previous manifest (issue #139). Collected across rounds:
+    // KSP calls process() once per round, and the manifest describes everything the compilation met.
+    private val slotsBySource = mutableMapOf<String, MutableSet<MockSlot>>()
+    private val reprocessed = mutableSetOf<String>()
 
     // Same reason, and the counts are only worth anything once they are complete: a per-round
     // summary would split one project across several lines that each look like the whole picture.
     private val tally = RoundTally()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        // The files KSP handed this run - every one on a clean build, only the affected ones on an
+        // incremental build. A later round adds the files the previous round generated, which hold
+        // no @Prev and so contribute nothing.
+        resolver.getNewFiles().forEach { reprocessed += it.filePath }
         resolver
             .getSymbolsWithAnnotation(PREV_ANNOTATION_NAME)
             .filterIsInstance<KSFunctionDeclaration>()
@@ -57,8 +65,9 @@ internal class PrevSymbolProcessor(
      * round would name slots that a later round goes on to decide.
      */
     override fun finish() {
-        writeSlotManifest()
-        warnAboutUndecidedSlots()
+        val sources = updatedSlotSources()
+        writeSlotManifest(sources)
+        warnAboutUndecidedSlots(sources.values.flatten())
         reportRound()
     }
 
@@ -74,9 +83,26 @@ internal class PrevSymbolProcessor(
         reportRound()
     }
 
-    private fun writeSlotManifest() {
+    /**
+     * The slots of every @Prev function in the module, not only those this run reprocessed.
+     *
+     * Without a manifest there is no previous state to merge with, so this run's slots are all there
+     * is. Only the missing-value warning sees that case, and only when the options are set by hand.
+     */
+    private fun updatedSlotSources(): Map<String, List<MockSlot>> {
+        val recorded = slotsBySource.mapValues { (_, slots) -> slots.sortedBy { it.path } }
+        val file = slotManifest ?: return recorded
+        return SlotSources.merge(
+            previous = SlotManifest.read(file),
+            reprocessed = reprocessed,
+            recorded = recorded,
+            exists = { File(it).exists() },
+        )
+    }
+
+    private fun writeSlotManifest(sources: Map<String, List<MockSlot>>) {
         val file = slotManifest ?: return
-        runCatching { SlotManifest.write(file, slots.recorded()) }
+        runCatching { SlotManifest.write(file, sources) }
             .onFailure { failure ->
                 // A manifest is a convenience for the generation task; failing to write one must
                 // not fail a compilation that has otherwise produced every Preview it was asked for.
@@ -93,13 +119,13 @@ internal class PrevSymbolProcessor(
      * would need credentials on every machine that compiles and would rewrite a committed file
      * behind whoever ran it.
      */
-    private fun warnAboutUndecidedSlots() {
+    private fun warnAboutUndecidedSlots(slots: List<MockSlot>) {
         if (!warnOnMissingValues) return
         val undecided =
             slots
-                .recorded()
                 .map { it.path }
                 .distinct()
+                .sorted()
                 .filter { mockValues[it] == null }
         MissingValueReport.message(undecided)?.let(logger::warn)
     }
@@ -139,9 +165,9 @@ internal class PrevSymbolProcessor(
             return
         }
 
-        val arguments = buildMockArguments(function) ?: return
+        val cases = previewCases(function) ?: return
         val options = function.previewOptions()
-        val fileSpec = PreviewFileGenerator.generate(function, arguments, options)
+        val fileSpec = PreviewFileGenerator.generate(function, cases, options)
 
         codeGenerator
             .createNewFile(
@@ -154,8 +180,9 @@ internal class PrevSymbolProcessor(
         tally.generated()
     }
 
-    private fun buildMockArguments(function: KSFunctionDeclaration): Map<String, CodeBlock>? {
+    private fun previewCases(function: KSFunctionDeclaration): List<PreviewCase>? {
         val parameters = function.parameters.mapNotNull { it.toMockParameter(owner = function.qualifiedName?.asString()) }
+        val slots = SlotRecorder()
         val context = MockContext.root(mockGenerators, mockValues, slots)
         val unsupported = firstUnsupportedParameter(parameters, context)
         if (unsupported != null) {
@@ -167,7 +194,11 @@ internal class PrevSymbolProcessor(
             )
             return null
         }
-        return buildMockArguments(parameters, context)
+        // One recorder across every case, so a field only one subtype has - Success.title - is filed
+        // under this source file like any other slot of its Previews.
+        return SealedParameterExpansion.cases(parameters) { MockContext.root(mockGenerators, mockValues, slots) }.also {
+            slotsBySource.getOrPut(function.containingFile!!.filePath) { linkedSetOf() } += slots.recorded()
+        }
     }
 
     /**

@@ -80,10 +80,21 @@ member read off it is answered by relaxed mode, with the consequences described 
 
 ## Which subtype does PrevHam pick for a sealed type?
 
-`object` subtypes first, then by simple name, taking the first one it can actually build. So a
-`Loading`/`Success`/`Error` UI state resolves to `Loading`. The order is fixed rather than left to
-`getSealedSubclasses()`, which promises no particular ordering, so the generated file doesn't change
-between builds.
+It depends on where the sealed type appears.
+
+**A parameter of the composable** gets every subtype it can build, one Preview each. A
+`Loading`/`Success`/`Error` UI state produces `<Composable>LoadingPreview`, `<Composable>ErrorPreview`
+and `<Composable>SuccessPreview` in one file, each with `@Preview(name = "<Subtype>")`. Only the first
+sealed parameter with more than one buildable subtype is expanded; expanding two would produce their
+product. Since 1.5.0 — before that a parameter got one subtype, as below (issue #138).
+
+**Anywhere deeper** — a data class field, a ViewModel's `StateFlow<UiState>`, a sealed subtype that is
+itself sealed — gets one subtype, because the value there is part of a larger one.
+
+Either way the order is the same: `object` subtypes first, then by simple name. So `Loading` comes
+first, and is the one picked where only one is. The order is fixed rather than left to
+`getSealedSubclasses()`, which promises no particular ordering, not even declaration order — reordering
+the declarations changes nothing, by design. The generated file doesn't change between builds.
 
 If no subtype can be built — the sealed type is generic, or every subtype's fields exceed the depth
 limit — PrevHam falls back to `mockk<T>(relaxed = true)` for that type, with the caveat in the next

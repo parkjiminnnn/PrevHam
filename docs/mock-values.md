@@ -51,6 +51,31 @@ Two files move between the two halves, in opposite directions:
 | `build/generated/prevham/mock-value-slots.json` | the compiler, every build | the task | no — a build output |
 | `src/main/prevham/mock-values.json` | the task, or a person | the compiler, every build | **yes** |
 
+### The manifest after an incremental build
+
+KSP hands the processor only the files a change affects and keeps the other Previews as they were. The
+manifest follows the same rule. It records which source file each slot came from, and a build replaces
+the entries of the files it reprocessed and keeps the rest:
+
+```json
+{
+  "slots": [ "…every slot in the module…" ],
+  "sources": {
+    "…/home/FestivalOverview.kt": ["com.example.app.Festival.festivalName", "com.example.app.Festival.slogan"],
+    "…/setting/SettingScreen.kt": ["com.example.app.SettingScreen.appVersion"]
+  }
+}
+```
+
+`slots` is the whole list and the only part the task reads. `sources` is the compiler's bookkeeping. A
+file whose `@Prev` is removed loses its entry the next time it is reprocessed, and a deleted file loses
+its entry on the next build.
+
+Up to v1.4.1 the manifest was replaced instead, with only the slots of the files the last build
+reprocessed. Editing one file with no `@Prev` in it could drop most of a module's slots, so the task
+never asked about them and the missing-value warning never named them. On those versions, run
+`./gradlew clean` and build before running the task.
+
 ### Why the build does not call the model
 
 Calling the API from inside KSP was considered and rejected. It would make every build depend on the
@@ -321,11 +346,16 @@ Set warnOnMissingValues = false in the prevham { } block to stop hearing about i
 ```
 
 Nothing new is computed for this. The compiler already records every slot it meets and already reads
-the value file, both in the same round — the difference between them is the answer.
+the value file, both in the same round — the difference between them is the answer. The slots are the
+manifest's whole list, so an incremental build warns about the same ones a clean build does.
 
 Long lists are truncated after ten paths. Adopting this mid-project leaves every slot undecided on the
 first build, and a wall of paths helps nobody; the count and the task name are what is worth reading
 there.
+
+Upgrading to 1.5.0 adds slots of its own. A sealed parameter now gets a Preview per subtype, so the
+fields of `Success` and `Error` are filled where only `Loading` was before, and they show up here until
+the task is run again.
 
 ### It is still only a build
 

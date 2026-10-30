@@ -3,12 +3,12 @@ package io.github.parkjiminnnn.compiler.codegen
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import io.github.parkjiminnnn.compiler.PreviewOptions
 import io.github.parkjiminnnn.compiler.PreviewSettings
+import io.github.parkjiminnnn.compiler.mock.PreviewCase
 
 internal object PreviewFileGenerator {
     private val COMPOSABLE = ClassName("androidx.compose.runtime", "Composable")
@@ -25,32 +25,42 @@ internal object PreviewFileGenerator {
 
     fun generate(
         function: KSFunctionDeclaration,
-        arguments: Map<String, CodeBlock>,
+        cases: List<PreviewCase>,
         options: PreviewOptions,
     ): FileSpec {
         val functionName = function.simpleName.asString()
-        val previewName = "${functionName}Preview"
         val packageName = function.packageName.asString()
 
-        val previewFunction =
-            FunSpec
-                .builder(previewName)
-                .addModifiers(KModifier.PRIVATE)
-                .addAnnotations(previewAnnotations(options))
-                .addAnnotation(COMPOSABLE)
-                .addCode(buildNamedArgumentsCall(functionName, arguments))
-                .addCode("\n")
-                .build()
-
+        // One file per composable however many cases it has, so the file KSP ties to the source
+        // stays the same one and is replaced or removed as a whole.
         return FileSpec
-            .builder(packageName, previewName)
-            .addFunction(previewFunction)
+            .builder(packageName, "${functionName}Preview")
+            .apply { cases.forEach { addFunction(previewFunction(functionName, it, options)) } }
             .build()
     }
 
+    // `<Composable><Subtype>Preview` for a case, so each name says which subtype it shows and stays
+    // the same across builds - the subtypes are sorted before they get here.
+    private fun previewFunction(
+        functionName: String,
+        case: PreviewCase,
+        options: PreviewOptions,
+    ): FunSpec =
+        FunSpec
+            .builder("$functionName${case.label.orEmpty()}Preview")
+            .addModifiers(KModifier.PRIVATE)
+            .addAnnotations(previewAnnotations(case.label, options))
+            .addAnnotation(COMPOSABLE)
+            .addCode(buildNamedArgumentsCall(functionName, case.arguments))
+            .addCode("\n")
+            .build()
+
     // One @Preview per requested variant, plus the default. Compose's @Preview is @Repeatable, so
     // they stack on the single generated function rather than needing one wrapper each.
-    private fun previewAnnotations(options: PreviewOptions): List<AnnotationSpec> {
+    private fun previewAnnotations(
+        caseLabel: String?,
+        options: PreviewOptions,
+    ): List<AnnotationSpec> {
         val variants = mutableListOf<PreviewVariant>()
         variants += PreviewVariant(label = null)
 
@@ -67,7 +77,7 @@ internal object PreviewFileGenerator {
             variants += PreviewVariant("Device: $device") { addMember("device = %S", device) }
         }
 
-        return variants.map { variant -> variant.toAnnotation(options.settings) }
+        return variants.map { variant -> variant.toAnnotation(caseLabel, options.settings) }
     }
 
     private class PreviewVariant(
@@ -75,26 +85,28 @@ internal object PreviewFileGenerator {
         val addVariantMembers: AnnotationSpec.Builder.() -> Unit = {},
     )
 
-    private fun PreviewVariant.toAnnotation(settings: PreviewSettings): AnnotationSpec =
+    private fun PreviewVariant.toAnnotation(
+        caseLabel: String?,
+        settings: PreviewSettings,
+    ): AnnotationSpec =
         AnnotationSpec
             .builder(PREVIEW)
             .apply {
-                previewName(label, settings.name)?.let { addMember("name = %S", it) }
+                previewName(settings.name, caseLabel, label)?.let { addMember("name = %S", it) }
                 addVariantMembers()
                 addSettings(settings)
             }.build()
 
-    // A user-supplied name becomes the variants' common prefix rather than replacing their labels,
-    // so "Card", "Card - Dark Mode" and "Card - Locale: ko" all stay distinguishable in the IDE.
+    // A user-supplied name becomes the common prefix rather than replacing the labels after it, so
+    // "Card", "Card - Dark Mode" and "Card - Loading - Locale: ko" all stay distinguishable in the IDE.
     private fun previewName(
-        label: String?,
         configuredName: String,
+        caseLabel: String?,
+        variantLabel: String?,
     ): String? =
-        when {
-            configuredName.isEmpty() -> label
-            label == null -> configuredName
-            else -> "$configuredName - $label"
-        }
+        listOfNotNull(configuredName.ifEmpty { null }, caseLabel, variantLabel)
+            .joinToString(" - ")
+            .ifEmpty { null }
 
     // Only what differs from @Preview's own defaults is written out, so a bare @Prev still produces
     // a bare @Preview.

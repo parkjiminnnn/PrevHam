@@ -37,7 +37,7 @@ Annotate a `@Composable` function with `@Prev` and let PrevHam generate the `@Pr
 | Mock values | Supply real-looking values for `String` and numeric slots from a committed file — on a constructed value or stubbed onto a mocked type's member — written by hand, or filled in by a language model through a task that never runs during a build. Builds say which slots have none yet |
 | Nested data classes | Recursive mock generation for nested data classes and collections, as deep as the model goes — bounded by cycle detection, not a depth limit |
 | Interface mocks | Generates interface/non-data-class mocks via MockK (or a real instance, e.g. `Modifier`, when a self-implementing companion is available) |
-| Sealed type support | Builds a real subtype (e.g. `UiState.Loading`) instead of mocking the sealed type |
+| Sealed type support | Builds real subtypes instead of mocking the sealed type. A sealed parameter gets one Preview per subtype (`Loading`, `Success`, `Error`); a sealed type nested deeper gets one subtype |
 | Round summary | One line at the end of a build saying how many `@Prev` were found, generated and skipped, with the skipped ones and their reason under it |
 | Mock member stubbing | Stubs the members MockK's relaxed mode can't answer — those whose type erases, such as `StateFlow`/`Flow` — and leaves the rest to relaxed mode, so a mock stays as small as the Preview needs |
 | Function type mocks | Generates lambda literals for function-type parameters, mocking the return value for non-`Unit` types |
@@ -183,6 +183,36 @@ private fun UserCardPreview() {
     )
 }
 ```
+
+A composable that takes a sealed type gets one Preview per subtype, so every state can be seen side by side:
+
+```kotlin
+@Prev
+@Composable
+fun FestivalHeader(state: ScreenUiState) { /* ... */ }   // Loading, Success, Error
+```
+
+```kotlin
+@Preview(name = "Loading")
+@Composable
+private fun FestivalHeaderLoadingPreview() {
+    FestivalHeader(state = ScreenUiState.Loading)
+}
+
+@Preview(name = "Error")
+@Composable
+private fun FestivalHeaderErrorPreview() {
+    FestivalHeader(state = ScreenUiState.Error(message = "mock"))
+}
+
+@Preview(name = "Success")
+@Composable
+private fun FestivalHeaderSuccessPreview() {
+    FestivalHeader(state = ScreenUiState.Success(title = "mock"))
+}
+```
+
+Object subtypes come first, then the rest by name, so the order and the names do not depend on how the subtypes are declared. Only the first sealed parameter is expanded, and variants apply to each of the generated functions. See [the FAQ](docs/faq.md#which-subtype-does-prevham-pick-for-a-sealed-type).
 
 ### 4. (Optional) Configure the Preview
 
@@ -333,7 +363,7 @@ flowchart LR
 1. **Resolve** — `PrevSymbolProcessor` asks the KSP `Resolver` for every symbol annotated with `@Prev`.
 2. **Analyze** — each annotated function's parameter list is inspected: type, nullability, and shape (primitive, data class, collection, enum, interface). The `@Prev` annotation's own arguments are also read: the variant axes (`darkMode`, `locales`, `fontScales`, `devices`) decide how many `@Preview` annotations to emit, and the remaining settings are applied to all of them.
 3. **Generate mocks** — a dedicated mock generator produces a compile-time-safe value for each supported parameter type. Where a committed value file supplies one for a `String` or numeric slot, that value is used instead of the default (see [`docs/mock-values.md`](docs/mock-values.md)); the file is only ever read here, never written or fetched.
-4. **Emit source** — [KotlinPoet](https://square.github.io/kotlinpoet/) assembles a new `@Preview @Composable` function that calls the original composable with the generated mocks, stacking one `@Preview` per requested variant (Compose's `@Preview` is `@Repeatable`).
+4. **Emit source** — [KotlinPoet](https://square.github.io/kotlinpoet/) assembles a new `@Preview @Composable` function that calls the original composable with the generated mocks, stacking one `@Preview` per requested variant (Compose's `@Preview` is `@Repeatable`). A composable taking a sealed type gets one such function per subtype, in the same file.
 5. **Compile** — the generated file is fed back into the same compilation unit, so the Preview is available immediately, with full IDE support.
 
 ---
